@@ -1,0 +1,5 @@
+{
+  "name": "Social Content AI Generator",
+  "description": "An application to manage companies, business lines, and generate social media content ideas using AI. It provides a repository for saved ideas and allows fine-tuning AI parameters.",
+  "requestFramePermissions": []
+}
