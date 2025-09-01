@@ -7,6 +7,7 @@ import { initializeDatabase, closeDatabase } from './config/database';
 import authRoutes from './routes/auth';
 import companyRoutes from './routes/company';
 import ideaRoutes from './routes/ideas';
+import contentIdeaRoutes from './routes/contentIdeas';
 
 // Load environment variables
 dotenv.config();
@@ -73,6 +74,9 @@ app.use('/api/companies', companyRoutes);
 
 // Idea routes
 app.use('/api/ideas', ideaRoutes);
+
+// Content idea routes
+app.use('/api/companies', contentIdeaRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

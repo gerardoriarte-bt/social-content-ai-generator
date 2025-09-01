@@ -8,6 +8,10 @@ export interface AIParams {
   characterType: string;
   targetAudience: string;
   contentType: string;
+  socialNetwork: string;
+  contentFormat: string;
+  objective: string;
+  focus: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,6 +22,10 @@ export interface CreateAIParamsData {
   characterType: string;
   targetAudience: string;
   contentType: string;
+  socialNetwork: string;
+  contentFormat: string;
+  objective: string;
+  focus: string;
 }
 
 export interface UpdateAIParamsData {
@@ -25,13 +33,17 @@ export interface UpdateAIParamsData {
   characterType?: string;
   targetAudience?: string;
   contentType?: string;
+  socialNetwork?: string;
+  contentFormat?: string;
+  objective?: string;
+  focus?: string;
 }
 
 export class AIParamsModel {
   // Get AI params by business line ID
   static async findByBusinessLineId(businessLineId: string): Promise<AIParams | null> {
     const [rows] = await pool.execute(
-      'SELECT id, business_line_id as businessLineId, tone, character_type as characterType, target_audience as targetAudience, content_type as contentType, created_at as createdAt, updated_at as updatedAt FROM ai_params WHERE business_line_id = ?',
+      'SELECT id, business_line_id as businessLineId, tone, character_type as characterType, target_audience as targetAudience, content_type as contentType, social_network as socialNetwork, content_format as contentFormat, objective, focus, created_at as createdAt, updated_at as updatedAt FROM ai_params WHERE business_line_id = ?',
       [businessLineId]
     );
     const aiParams = rows as AIParams[];
@@ -41,7 +53,7 @@ export class AIParamsModel {
   // Get AI params by ID
   static async findById(id: string): Promise<AIParams | null> {
     const [rows] = await pool.execute(
-      'SELECT id, business_line_id as businessLineId, tone, character_type as characterType, target_audience as targetAudience, content_type as contentType, created_at as createdAt, updated_at as updatedAt FROM ai_params WHERE id = ?',
+      'SELECT id, business_line_id as businessLineId, tone, character_type as characterType, target_audience as targetAudience, content_type as contentType, social_network as socialNetwork, content_format as contentFormat, objective, focus, created_at as createdAt, updated_at as updatedAt FROM ai_params WHERE id = ?',
       [id]
     );
     const aiParams = rows as AIParams[];
@@ -53,8 +65,8 @@ export class AIParamsModel {
     const id = uuidv4();
     
     const [result] = await pool.execute(
-      'INSERT INTO ai_params (id, business_line_id, tone, character_type, target_audience, content_type) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, aiParamsData.businessLineId, aiParamsData.tone, aiParamsData.characterType, aiParamsData.targetAudience, aiParamsData.contentType]
+      'INSERT INTO ai_params (id, business_line_id, tone, character_type, target_audience, content_type, social_network, content_format, objective, focus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, aiParamsData.businessLineId, aiParamsData.tone, aiParamsData.characterType, aiParamsData.targetAudience, aiParamsData.contentType, aiParamsData.socialNetwork, aiParamsData.contentFormat, aiParamsData.objective, aiParamsData.focus]
     );
 
     return this.findById(id) as Promise<AIParams>;
@@ -80,6 +92,22 @@ export class AIParamsModel {
     if (aiParamsData.contentType !== undefined) {
       updateFields.push('content_type = ?');
       values.push(aiParamsData.contentType);
+    }
+    if (aiParamsData.socialNetwork !== undefined) {
+      updateFields.push('social_network = ?');
+      values.push(aiParamsData.socialNetwork);
+    }
+    if (aiParamsData.contentFormat !== undefined) {
+      updateFields.push('content_format = ?');
+      values.push(aiParamsData.contentFormat);
+    }
+    if (aiParamsData.objective !== undefined) {
+      updateFields.push('objective = ?');
+      values.push(aiParamsData.objective);
+    }
+    if (aiParamsData.focus !== undefined) {
+      updateFields.push('focus = ?');
+      values.push(aiParamsData.focus);
     }
 
     if (updateFields.length === 0) {

@@ -30,6 +30,10 @@ export const createAIParamsSchema = z.object({
   characterType: z.string().min(2, 'Character type must be at least 2 characters').max(50, 'Character type too long'),
   targetAudience: z.string().min(2, 'Target audience must be at least 2 characters').max(100, 'Target audience too long'),
   contentType: z.string().min(2, 'Content type must be at least 2 characters').max(50, 'Content type too long'),
+  socialNetwork: z.string().min(2, 'Social network must be at least 2 characters').max(50, 'Social network too long'),
+  contentFormat: z.string().min(2, 'Content format must be at least 2 characters').max(50, 'Content format too long'),
+  objective: z.string().min(2, 'Objective must be at least 2 characters').max(50, 'Objective too long'),
+  focus: z.string().max(200, 'Focus too long'),
 });
 
 export const updateAIParamsSchema = z.object({
@@ -37,6 +41,10 @@ export const updateAIParamsSchema = z.object({
   characterType: z.string().min(2, 'Character type must be at least 2 characters').max(50, 'Character type too long').optional(),
   targetAudience: z.string().min(2, 'Target audience must be at least 2 characters').max(100, 'Target audience too long').optional(),
   contentType: z.string().min(2, 'Content type must be at least 2 characters').max(50, 'Content type too long').optional(),
+  socialNetwork: z.string().min(2, 'Social network must be at least 2 characters').max(50, 'Social network too long').optional(),
+  contentFormat: z.string().min(2, 'Content format must be at least 2 characters').max(50, 'Content format too long').optional(),
+  objective: z.string().min(2, 'Objective must be at least 2 characters').max(50, 'Objective too long').optional(),
+  focus: z.string().max(200, 'Focus too long').optional(),
 });
 
 // Idea Group schemas

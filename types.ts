@@ -38,6 +38,10 @@ export interface AIParams {
   characterType: string;
   targetAudience: string;
   contentType: string;
+  socialNetwork: string;
+  contentFormat: string;
+  objective: string;
+  focus: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,9 +49,10 @@ export interface AIParams {
 // Content Idea types
 export interface ContentIdea {
   id: string;
-  ideaGroupId: string;
+  businessLineId: string;
   title: string;
   description: string;
+  rationale: string;
   platform: string;
   hashtags: string[];
   createdAt: string;

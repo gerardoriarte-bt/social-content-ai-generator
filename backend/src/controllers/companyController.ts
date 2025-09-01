@@ -237,9 +237,23 @@ export class CompanyController {
           companyId,
         });
 
+        // Create default AI parameters for the new business line
+        const defaultAIParams = await AIParamsModel.create({
+          businessLineId: businessLine.id,
+          tone: 'Profesional y amigable',
+          characterType: 'Experto en la industria',
+          targetAudience: 'Clientes potenciales y existentes',
+          contentType: 'Posts informativos y promocionales',
+          socialNetwork: 'Instagram',
+          contentFormat: 'Post',
+          objective: 'Awareness',
+          focus: '',
+        });
+
         return res.status(201).json({
           message: 'Business line created successfully',
           businessLine,
+          aiParams: defaultAIParams,
         });
       } catch (error) {
         console.error('Create business line error:', error);
@@ -395,7 +409,7 @@ export class CompanyController {
         }
 
         const { companyId, businessLineId } = req.params;
-        const { tone, characterType, targetAudience, contentType } = req.body;
+        const { tone, characterType, targetAudience, contentType, socialNetwork, contentFormat, objective, focus } = req.body;
 
         // Check if company belongs to user
         if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
@@ -425,6 +439,10 @@ export class CompanyController {
           characterType,
           targetAudience,
           contentType,
+          socialNetwork,
+          contentFormat,
+          objective,
+          focus,
         });
 
         return res.status(201).json({
@@ -452,7 +470,7 @@ export class CompanyController {
         }
 
         const { companyId, businessLineId, aiParamsId } = req.params;
-        const { tone, characterType, targetAudience, contentType } = req.body;
+        const { tone, characterType, targetAudience, contentType, socialNetwork, contentFormat, objective, focus } = req.body;
 
         // Check if company belongs to user
         if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
@@ -480,6 +498,10 @@ export class CompanyController {
           characterType,
           targetAudience,
           contentType,
+          socialNetwork,
+          contentFormat,
+          objective,
+          focus,
         });
 
         if (!updatedAIParams) {

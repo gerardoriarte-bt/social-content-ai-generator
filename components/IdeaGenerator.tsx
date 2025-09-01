@@ -1,359 +1,178 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { generateContentIdeas, generateAlternativeIdeas } from '../services/geminiService';
-import { addIdeaGroup, updateIdeaGroup } from '../services/dataService';
-import type { Company, BusinessLine, ContentIdea, AIParams, IdeaGroup, User } from '../types';
-import { SparklesIcon, LightbulbIcon, ArrowPathIcon, SpinnerIcon } from './icons';
+import React, { useState } from 'react';
+import { IdeaService } from '../services/ideaService';
+import { CompanyService } from '../services/companyService';
+import { AIParamsForm } from './AIParamsForm';
+import { ContentIdea, Company, BusinessLine, AIParams } from '../types';
 
 interface IdeaGeneratorProps {
   company: Company;
   businessLine: BusinessLine;
-  user: User;
-  existingGroup?: IdeaGroup | null;
+  onIdeasGenerated: (ideas: ContentIdea[]) => void;
 }
 
-const aiParamOptions = {
-  socialNetwork: ['Instagram', 'TikTok', 'LinkedIn', 'Facebook', 'X (Twitter)'],
-  contentType: ['Post', 'Story', 'Reel', 'Carousel', 'Article'],
-  tone: ['Formal', 'Informal', 'Humorous', 'Inspirational', 'Serious', 'Empathetic'],
-  intention: ['Educate', 'Entertain', 'Persuade', 'Convert', 'Inform'],
-  emotion: ['Joy', 'Surprise', 'Trust', 'Anticipation', 'Excitement', 'Nostalgia'],
-  character: ['Expert', 'Friend', 'Mentor', 'Entertainer', 'Motivator'],
-};
-
-const AIP_DEFAULTS: AIParams = {
-    socialNetwork: 'Instagram',
-    contentType: 'Post',
-    tone: 'Informal',
-    intention: 'Entertain',
-    emotion: 'Joy',
-    character: 'Friend',
-}
-
-const UpDownChevronIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-    </svg>
-);
-
-
-const ParamSelector: React.FC<{ label: string; value: string; options: string[]; onChange: (value: string) => void;}> = ({ label, value, options, onChange}) => (
-    <div>
-        <label className="block text-sm font-medium text-slate-700">{label}</label>
-        <div className="relative mt-1">
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="block w-full appearance-none px-4 py-2.5 pr-10 bg-slate-100 border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-premium-red-500 sm:text-sm"
-            >
-                {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-600">
-                <UpDownChevronIcon className="w-5 h-5"/>
-            </div>
-        </div>
-    </div>
-);
-
-export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessLine, user, existingGroup: initialExistingGroup = null }) => {
-  const [activeGroup, setActiveGroup] = useState<IdeaGroup | null>(initialExistingGroup);
-  const [params, setParams] = useState<AIParams>(AIP_DEFAULTS);
-  const [groupName, setGroupName] = useState('');
-  const [objective, setObjective] = useState('');
-  const [generatedIdeas, setGeneratedIdeas] = useState<ContentIdea[]>([]);
-  const [selectedIdeas, setSelectedIdeas] = useState<Set<string>>(new Set());
-  const [isLoading, setIsLoading] = useState(false);
-  const [iteratingIdeaId, setIteratingIdeaId] = useState<string | null>(null);
+export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessLine, onIdeasGenerated }) => {
+  const [numberOfIdeas, setNumberOfIdeas] = useState(5);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [visibleRationales, setVisibleRationales] = useState<Record<string, boolean>>({});
+  const [isGeminiConnected, setIsGeminiConnected] = useState<boolean | null>(null);
+  const [aiParams, setAiParams] = useState<AIParams | null>(null);
+  const [showAIParamsForm, setShowAIParamsForm] = useState(false);
 
-  useEffect(() => {
-    setActiveGroup(initialExistingGroup);
-    
-    if (initialExistingGroup) {
-        setGroupName(initialExistingGroup.name);
-        setObjective(initialExistingGroup.objective);
-        setParams(initialExistingGroup.params);
-    } else {
-        setGroupName('');
-        setObjective('');
-        setParams(AIP_DEFAULTS);
-    }
-    setGeneratedIdeas([]);
-    setSelectedIdeas(new Set());
-  }, [initialExistingGroup]);
+  // Test Gemini connection and load AI params on component mount
+  React.useEffect(() => {
+    const initialize = async () => {
+      try {
+        // Test Gemini connection
+        const connected = await IdeaService.testGeminiConnection();
+        setIsGeminiConnected(connected);
 
-  const handleParamChange = useCallback(<K extends keyof AIParams,>(param: K, value: AIParams[K]) => {
-    setParams(prev => ({ ...prev, [param]: value }));
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!groupName.trim() || !objective.trim()) {
-        setError("Group Name and Objective are required.");
-        return;
-    }
-    setIsLoading(true);
-    setError(null);
-    setGeneratedIdeas([]);
-    setSelectedIdeas(new Set());
-    setVisibleRationales({});
-    try {
-      const ideas = await generateContentIdeas(company, businessLine, params, objective);
-      setGeneratedIdeas(ideas);
-    } catch (err: any) {
-      setError(err.message || 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleIterateIdea = async (e: React.MouseEvent, ideaToIterate: ContentIdea) => {
-    e.stopPropagation();
-    setIteratingIdeaId(ideaToIterate.id);
-    setError(null);
-    try {
-        const alternatives = await generateAlternativeIdeas(ideaToIterate, company, businessLine, params, objective);
-        setGeneratedIdeas(prevIdeas => 
-            prevIdeas.map(idea => 
-                idea.id === ideaToIterate.id 
-                    ? { ...idea, alternatives: [...(idea.alternatives || []), ...alternatives] } 
-                    : idea
-            )
-        );
-    } catch (err: any) {
-        setError(err.message || 'An unknown error occurred while iterating.');
-    } finally {
-        setIteratingIdeaId(null);
-    }
-  };
-
-  const handleSaveIdeas = () => {
-    if (selectedIdeas.size === 0) {
-        alert("Please select at least one idea to save.");
-        return;
-    }
-    
-    const ideasToSave: ContentIdea[] = [];
-    const ideaFinder = (idea: ContentIdea) => {
-        if(selectedIdeas.has(idea.id)) {
-            // Create a clean copy without alternatives for saving
-            const { alternatives, ...ideaWithoutAlternatives } = idea;
-            ideasToSave.push(ideaWithoutAlternatives);
-        }
-        if(idea.alternatives) {
-            idea.alternatives.forEach(ideaFinder);
-        }
-    }
-    generatedIdeas.forEach(ideaFinder);
-
-
-    if (activeGroup) {
-        const updatedGroup: IdeaGroup = {
-            ...activeGroup,
-            ideas: [...activeGroup.ideas, ...ideasToSave],
-        };
-        updateIdeaGroup(user.id, updatedGroup);
-        setActiveGroup(updatedGroup); // Update local state to prevent staleness on next save
-        alert(`${ideasToSave.length} more ideas added successfully to the group "${activeGroup.name}"!`);
-    } else {
-        const newIdeaGroup: IdeaGroup = {
-          id: Date.now().toString(),
-          name: groupName,
-          objective,
-          companyId: company.id,
-          businessLineId: businessLine.id,
-          companyName: company.name,
-          businessLineName: businessLine.name,
-          createdAt: new Date().toISOString(),
-          ideas: ideasToSave,
-          params,
-        };
-        addIdeaGroup(user.id, newIdeaGroup);
-        alert(`${ideasToSave.length} ideas saved successfully to a new group!`);
-    }
-    
-    setGeneratedIdeas([]);
-    setSelectedIdeas(new Set());
-  };
-  
-  const toggleRationale = (e: React.MouseEvent, ideaId: string) => {
-    e.stopPropagation();
-    setVisibleRationales(prev => ({...prev, [ideaId]: !prev[ideaId]}));
-  };
-
-  const toggleIdeaSelection = (ideaId: string) => {
-    setSelectedIdeas(prev => {
-        const newSelection = new Set(prev);
-        if (newSelection.has(ideaId)) {
-            newSelection.delete(ideaId);
-        } else {
-            newSelection.add(ideaId);
-        }
-        return newSelection;
-    });
-  };
-
-  const handleSelectAll = () => {
-    const allIdeaIds: string[] = [];
-    const collectIds = (ideas: ContentIdea[]) => {
-        ideas.forEach(idea => {
-            allIdeaIds.push(idea.id);
-            if (idea.alternatives) {
-                collectIds(idea.alternatives);
-            }
-        });
+        // Load AI params
+        const params = await CompanyService.getAIParams(company.id, businessLine.id);
+        setAiParams(params);
+      } catch (error) {
+        setIsGeminiConnected(false);
+        console.error('Error initializing:', error);
+      }
     };
-    collectIds(generatedIdeas);
+    initialize();
+  }, [company.id, businessLine.id]);
 
-    if (selectedIdeas.size === allIdeaIds.length) {
-        setSelectedIdeas(new Set());
-    } else {
-        setSelectedIdeas(new Set(allIdeaIds));
+  const handleGenerateIdeas = async () => {
+    if (!aiParams) {
+      setError('AI parameters not found for this business line');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const ideas = await IdeaService.generateIdeas(company.id, businessLine.id, numberOfIdeas);
+      onIdeasGenerated(ideas);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate ideas');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  const IdeaCard: React.FC<{ idea: ContentIdea, isAlternative?: boolean }> = ({ idea, isAlternative = false }) => {
-    const isSelected = selectedIdeas.has(idea.id);
-    const isIterating = iteratingIdeaId === idea.id;
-    return (
-        <div 
-            onClick={() => toggleIdeaSelection(idea.id)}
-            className={`relative p-6 rounded-2xl shadow-md transition-all duration-200 cursor-pointer ${isSelected ? 'ring-2 ring-premium-red-500 shadow-lg' : 'hover:shadow-lg'} ${isAlternative ? 'bg-slate-50' : 'bg-white'}`}
-        >
-            <div className="flex justify-between items-start">
-                <h3 className="text-lg font-semibold text-premium-red-600 flex-1 pr-16">{idea.title}</h3>
-                <div className="absolute top-4 right-4 flex items-center gap-2">
-                    {!isAlternative && (
-                        <button 
-                            onClick={(e) => handleIterateIdea(e, idea)} 
-                            disabled={isIterating}
-                            className="p-1 text-slate-400 hover:text-premium-red-500 disabled:cursor-not-allowed" 
-                            title="Generate alternatives"
-                        >
-                           {isIterating ? <SpinnerIcon className="w-5 h-5"/> : <ArrowPathIcon className="w-5 h-5" />}
-                        </button>
-                    )}
-                    <button onClick={(e) => toggleRationale(e, idea.id)} className="p-1 text-slate-400 hover:text-premium-yellow-500" title="Show AI Rationale">
-                        <LightbulbIcon className="w-5 h-5" />
-                    </button>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${isSelected ? 'bg-premium-red-600' : 'bg-white border-2 border-slate-300'}`}>
-                        {isSelected && (
-                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                        )}
-                    </div>
-                </div>
-            </div>
-            <p className="mt-2 text-slate-700">{idea.description}</p>
-            {visibleRationales[idea.id] && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm font-semibold text-premium-yellow-800">AI Rationale:</p>
-                    <p className="mt-1 text-sm text-yellow-700">{idea.rationale}</p>
-                </div>
-            )}
-            <div className="mt-4 flex flex-wrap gap-2">
-                {idea.hashtags.map(tag => (
-                    <span key={tag} className="px-2 py-1 bg-slate-200 text-slate-700 text-xs font-medium rounded-full">#{tag}</span>
-                ))}
-            </div>
-        </div>
-    )
-  }
-
-  const countAllIdeas = () => {
-    let count = 0;
-    const counter = (ideas: ContentIdea[]) => {
-        ideas.forEach(idea => {
-            count++;
-            if (idea.alternatives) counter(idea.alternatives);
-        });
-    };
-    counter(generatedIdeas);
-    return count;
+  const handleAIParamsSave = (savedParams: AIParams) => {
+    setAiParams(savedParams);
+    setError(null);
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1">
-        <div className="bg-white p-6 rounded-2xl shadow-md sticky top-24">
-          <h2 className="text-2xl font-bold text-slate-900">{activeGroup ? 'Add More Ideas' : 'Generate New Ideas'}</h2>
-          <p className="text-sm text-slate-600 mt-1">For <span className="font-semibold">{company.name} / {businessLine.name}</span></p>
-          
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-slate-700">Group Name</label>
-                <input type="text" value={groupName} onChange={e => setGroupName(e.target.value)} placeholder="e.g., Q3 Product Launch" className="mt-1 block w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-premium-red-500 sm:text-sm read-only:bg-slate-200/50 read-only:cursor-not-allowed" required readOnly={!!activeGroup} />
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-slate-700">Objective</label>
-                <textarea value={objective} onChange={e => setObjective(e.target.value)} placeholder="e.g., Drive awareness for the new product features" rows={3} className="mt-1 block w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-premium-red-500 sm:text-sm read-only:bg-slate-200/50 read-only:cursor-not-allowed" required readOnly={!!activeGroup}/>
-            </div>
-
-            <h3 className="text-lg font-semibold text-slate-800 pt-4 border-t border-slate-200">AI Parameters</h3>
-            {Object.entries(aiParamOptions).map(([key, options]) => (
-                <ParamSelector key={key} label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} value={params[key as keyof AIParams]} options={options} onChange={(value) => handleParamChange(key as keyof AIParams, value)} />
-            ))}
-            
-            <button type="submit" disabled={isLoading} className="w-full inline-flex justify-center items-center gap-2 px-4 py-3 bg-premium-red-600 text-white text-base font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 disabled:bg-slate-400">
-              <SparklesIcon className="w-5 h-5" />
-              {isLoading ? 'Generating...' : 'Generate Ideas'}
-            </button>
-          </form>
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">
+          Generar Ideas con IA
+        </h2>
+        <div className="flex items-center space-x-2">
+          <div className={`w-3 h-3 rounded-full ${isGeminiConnected === null ? 'bg-yellow-400' : isGeminiConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+          <span className="text-sm text-gray-600">
+            {isGeminiConnected === null ? 'Conectando...' : isGeminiConnected ? 'Gemini AI Conectado' : 'Gemini AI Desconectado'}
+          </span>
         </div>
       </div>
 
-      <div className="lg:col-span-2">
-        {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-6" role="alert"><p>{error}</p></div>}
-        
-        {isLoading && (
-            <div className="text-center p-10 bg-white rounded-2xl shadow-md">
-                <SpinnerIcon className="h-12 w-12 text-premium-red-600 mx-auto" />
-                <p className="mt-4 text-slate-700">AI is thinking... this may take a moment.</p>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Número de Ideas
+          </label>
+          <select
+            value={numberOfIdeas}
+            onChange={(e) => setNumberOfIdeas(Number(e.target.value))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isGenerating}
+          >
+            <option value={1}>1 idea</option>
+            <option value={3}>3 ideas</option>
+            <option value={5}>5 ideas</option>
+            <option value={7}>7 ideas</option>
+            <option value={10}>10 ideas</option>
+          </select>
+        </div>
+
+        {!aiParams && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-yellow-800 text-sm">
+                No se encontraron parámetros de IA para esta línea de negocio
+              </p>
+              <button
+                onClick={() => setShowAIParamsForm(true)}
+                className="px-3 py-1 bg-yellow-600 text-white text-sm rounded-md hover:bg-yellow-700"
+              >
+                Configurar
+              </button>
             </div>
+          </div>
         )}
 
-        {generatedIdeas.length > 0 && (
-            <div>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold text-slate-900">Generated Ideas</h2>
-                    <div className="flex items-center gap-4">
-                        <button onClick={handleSelectAll} className="text-sm font-medium text-premium-red-600 hover:underline">
-                            {selectedIdeas.size === countAllIdeas() && countAllIdeas() > 0 ? 'Deselect All' : 'Select All'}
-                        </button>
-                        <button 
-                            onClick={handleSaveIdeas} 
-                            disabled={selectedIdeas.size === 0}
-                            className="px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 disabled:bg-slate-400 disabled:cursor-not-allowed"
-                        >
-                            Save ({selectedIdeas.size}) Selected
-                        </button>
-                    </div>
-                </div>
-                <div className="space-y-4">
-                    {generatedIdeas.map((idea) => (
-                       <React.Fragment key={idea.id}>
-                            <IdeaCard idea={idea} />
-                            {idea.alternatives && idea.alternatives.length > 0 && (
-                                <div className="ml-4 pl-4 border-l-2 border-slate-200 space-y-4">
-                                    {idea.alternatives.map(alt => <IdeaCard key={alt.id} idea={alt} isAlternative={true} />)}
-                                </div>
-                            )}
-                       </React.Fragment>
-                    ))}
-                </div>
+        {aiParams && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-800 text-sm font-medium">Parámetros de IA configurados</p>
+                <p className="text-green-700 text-xs mt-1">
+                  Tono: {aiParams.tone} | Personaje: {aiParams.characterType}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAIParamsForm(true)}
+                className="px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
+              >
+                Editar
+              </button>
             </div>
+          </div>
         )}
 
-        {!isLoading && generatedIdeas.length === 0 && !error && (
-             <div className="text-center p-10 bg-white rounded-2xl shadow-md">
-                <SparklesIcon className="h-12 w-12 text-slate-400 mx-auto" />
-                <h3 className="mt-4 text-lg font-medium text-slate-800">Ready to create?</h3>
-                <p className="mt-1 text-sm text-slate-600">Fill out the form to generate your social media content ideas.</p>
-            </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
         )}
+
+        <button
+          onClick={handleGenerateIdeas}
+          disabled={isGenerating || !isGeminiConnected || !aiParams}
+          className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
+            isGenerating || !isGeminiConnected || !aiParams
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+          }`}
+        >
+          {isGenerating ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Generando ideas...
+            </div>
+          ) : (
+            'Generar Ideas con IA'
+          )}
+        </button>
       </div>
+
+      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+        <h3 className="text-lg font-semibold text-blue-900 mb-3">Información de la Generación</h3>
+        <div className="space-y-2 text-sm">
+          <div><strong>Empresa:</strong> {company.name}</div>
+          <div><strong>Línea de Negocio:</strong> {businessLine.name}</div>
+          <div><strong>Industria:</strong> {company.industry}</div>
+          <div><strong>Descripción:</strong> {company.description}</div>
+        </div>
+      </div>
+
+      <AIParamsForm
+        companyId={company.id}
+        businessLineId={businessLine.id}
+        isOpen={showAIParamsForm}
+        onClose={() => setShowAIParamsForm(false)}
+        onSave={handleAIParamsSave}
+      />
     </div>
   );
 };

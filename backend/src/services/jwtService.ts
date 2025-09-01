@@ -18,7 +18,7 @@ export class JWTService {
       email: user.email,
     };
 
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
   }
 
   // Verify JWT token
@@ -64,7 +64,7 @@ export class JWTService {
       return jwt.sign(
         { userId: decoded.userId, email: decoded.email },
         JWT_SECRET,
-        { expiresIn: '7d' }
+        { expiresIn: '30d' }
       );
     } catch (error) {
       return null;

@@ -1,44 +1,27 @@
 import React, { useState, useCallback } from 'react';
-import { getCompanies, saveCompanies } from '../services/dataService';
-import type { Company, BusinessLine, User } from '../types';
+import { CompanyService } from '../services/companyService';
+import type { Company, BusinessLine } from '../types';
 import { Modal } from './Modal';
 import { PlusIcon, PencilIcon, TrashIcon, SparklesIcon } from './icons';
 
 interface BusinessLineManagerProps {
   company: Company;
-  onStartGeneration: (company: Company, businessLine: BusinessLine) => void;
-  user: User;
+  onBusinessLineSelect: (businessLine: BusinessLine) => void;
+  onBusinessLinesUpdate: (updatedCompany: Company) => void;
 }
 
-const AddBusinessLineCard: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-    <button
-      onClick={onClick}
-      className="relative block w-full h-full min-h-[180px] border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-premium-red-500 hover:text-premium-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-500 transition-colors duration-200 flex flex-col items-center justify-center"
-    >
-      <PlusIcon className="mx-auto h-8 w-8" />
-      <span className="mt-2 block text-sm font-semibold">Add Business Line</span>
-    </button>
-);
-
-
-export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ company, onStartGeneration, user }) => {
+export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ company, onBusinessLineSelect, onBusinessLinesUpdate }) => {
   const [currentCompany, setCurrentCompany] = useState<Company>(company);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLine, setEditingLine] = useState<BusinessLine | null>(null);
   const [lineName, setLineName] = useState('');
-  const [lineContext, setLineContext] = useState('');
-
-  const updateCompany = (updatedCompany: Company) => {
-    const allCompanies = getCompanies(user.id);
-    const updatedCompanies = allCompanies.map(c => c.id === updatedCompany.id ? updatedCompany : c);
-    saveCompanies(user.id, updatedCompanies);
-    setCurrentCompany(updatedCompany);
-  };
+  const [lineDescription, setLineDescription] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleOpenModal = useCallback((line: BusinessLine | null = null) => {
     setEditingLine(line);
     setLineName(line ? line.name : '');
-    setLineContext(line ? line.context : '');
+    setLineDescription(line ? line.description : '');
     setIsModalOpen(true);
   }, []);
   
@@ -46,35 +29,67 @@ export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ compan
     setIsModalOpen(false);
     setEditingLine(null);
     setLineName('');
-    setLineContext('');
+    setLineDescription('');
   }, []);
 
-  const handleSaveLine = useCallback(() => {
-    if (!lineName.trim() || !lineContext.trim()) return;
+  const handleSaveLine = useCallback(async () => {
+    if (!lineName.trim() || !lineDescription.trim()) return;
 
-    let updatedLines;
-    if (editingLine) {
-      updatedLines = currentCompany.businessLines.map(l => 
-        l.id === editingLine.id ? { ...l, name: lineName.trim(), context: lineContext.trim() } : l
-      );
-    } else {
-      const newLine: BusinessLine = {
-        id: Date.now().toString(),
-        name: lineName.trim(),
-        context: lineContext.trim(),
-      };
-      updatedLines = [...currentCompany.businessLines, newLine];
+    setIsLoading(true);
+    try {
+      if (editingLine) {
+        const updatedBusinessLine = await CompanyService.updateBusinessLine(
+          currentCompany.id,
+          editingLine.id,
+          {
+            name: lineName.trim(),
+            description: lineDescription.trim(),
+          }
+        );
+        const updatedLines = currentCompany.businessLines.map(l => 
+          l.id === editingLine.id ? updatedBusinessLine : l
+        );
+        const updatedCompany = { ...currentCompany, businessLines: updatedLines };
+        setCurrentCompany(updatedCompany);
+        onBusinessLinesUpdate(updatedCompany);
+      } else {
+        const newBusinessLine = await CompanyService.createBusinessLine(
+          currentCompany.id,
+          {
+            name: lineName.trim(),
+            description: lineDescription.trim(),
+          }
+        );
+        const updatedCompany = { 
+          ...currentCompany, 
+          businessLines: [...currentCompany.businessLines, newBusinessLine] 
+        };
+        setCurrentCompany(updatedCompany);
+        onBusinessLinesUpdate(updatedCompany);
+      }
+      handleCloseModal();
+    } catch (error) {
+      console.error('Error saving business line:', error);
+      alert('Error saving business line. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    updateCompany({ ...currentCompany, businessLines: updatedLines });
-    handleCloseModal();
-  }, [lineName, lineContext, editingLine, currentCompany, handleCloseModal]);
+  }, [lineName, lineDescription, editingLine, currentCompany, onBusinessLinesUpdate, handleCloseModal]);
   
-  const handleDeleteLine = useCallback((lineId: string) => {
+  const handleDeleteLine = useCallback(async (lineId: string) => {
     if (window.confirm('Are you sure you want to delete this business line?')) {
-      const updatedLines = currentCompany.businessLines.filter(l => l.id !== lineId);
-      updateCompany({ ...currentCompany, businessLines: updatedLines });
+      try {
+        await CompanyService.deleteBusinessLine(currentCompany.id, lineId);
+        const updatedLines = currentCompany.businessLines.filter(l => l.id !== lineId);
+        const updatedCompany = { ...currentCompany, businessLines: updatedLines };
+        setCurrentCompany(updatedCompany);
+        onBusinessLinesUpdate(updatedCompany);
+      } catch (error) {
+        console.error('Error deleting business line:', error);
+        alert('Error deleting business line. Please try again.');
+      }
     }
-  }, [currentCompany]);
+  }, [currentCompany, onBusinessLinesUpdate]);
 
   return (
     <div>
@@ -83,76 +98,115 @@ export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ compan
           <h1 className="text-3xl font-bold text-slate-900">{currentCompany.name}</h1>
           <p className="text-lg text-slate-600">Business Lines</p>
         </div>
+        <button
+          onClick={() => handleOpenModal()}
+          className="inline-flex items-center px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
+        >
+          <PlusIcon className="w-5 h-5 mr-2" />
+          Create Business Line
+        </button>
       </div>
       
       {currentCompany.businessLines.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {currentCompany.businessLines.map((line) => (
-              <div key={line.id} className="bg-white p-6 rounded-2xl shadow-md flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start">
-                    <h2 className="text-xl font-semibold text-slate-900 flex-1 pr-2">{line.name}</h2>
-                    <div className="flex items-center space-x-1 flex-shrink-0">
-                      <button onClick={() => handleOpenModal(line)} className="p-2 text-slate-500 hover:text-premium-yellow-500 rounded-full"><PencilIcon /></button>
-                      <button onClick={() => handleDeleteLine(line.id)} className="p-2 text-slate-500 hover:text-premium-red-600 rounded-full"><TrashIcon /></button>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600 p-4 bg-slate-100 rounded-lg line-clamp-3">{line.context}</p>
-                </div>
-                <div className="mt-4 text-right">
+          {currentCompany.businessLines.map((line) => (
+            <div 
+              key={line.id} 
+              onClick={() => onBusinessLineSelect(line)}
+              className="bg-white p-6 rounded-2xl shadow-md flex flex-col justify-between hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer"
+            >
+              <div>
+                <div className="flex justify-between items-start">
+                  <h2 className="text-xl font-semibold text-slate-900 flex-1 pr-2">{line.name}</h2>
+                  <div className="flex items-center space-x-1 flex-shrink-0">
                     <button 
-                      onClick={() => onStartGeneration(currentCompany, line)}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenModal(line);
+                      }} 
+                      className="p-2 text-slate-500 hover:text-premium-yellow-500 rounded-full"
                     >
-                      <SparklesIcon className="w-5 h-5" />
-                      Generate Ideas
+                      <PencilIcon />
                     </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteLine(line.id);
+                      }} 
+                      className="p-2 text-slate-500 hover:text-premium-red-600 rounded-full"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
                 </div>
+                <p className="mt-2 text-sm text-slate-600 p-4 bg-slate-100 rounded-lg line-clamp-3">{line.description}</p>
               </div>
-            ))}
-            <AddBusinessLineCard onClick={() => handleOpenModal()} />
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm text-slate-500">Click to view ideas</span>
+                <SparklesIcon className="w-5 h-5 text-slate-400" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
-        <div className="text-center py-16 px-6 bg-white rounded-2xl shadow-md">
-            <h3 className="text-lg font-medium text-slate-800">No business lines found</h3>
-            <p className="mt-1 text-sm text-slate-600">Add a business line to start generating content ideas.</p>
-            <button
+        <div className="text-center py-16">
+          <div className="max-w-md mx-auto">
+            <div className="bg-white rounded-2xl shadow-md p-8">
+              <h3 className="text-lg font-medium text-slate-800 mb-4">No business lines yet</h3>
+              <p className="text-sm text-slate-600 mb-6">Create your first business line to start generating content ideas.</p>
+              <button
                 onClick={() => handleOpenModal()}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
-            >
-                <PlusIcon className="w-5 h-5" />
-                Add Business Line
-            </button>
+                className="w-full inline-flex justify-center items-center px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
+              >
+                <PlusIcon className="w-5 h-5 mr-2" />
+                Create Your First Business Line
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingLine ? 'Edit Business Line' : 'Add Business Line'}>
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="line-name" className="block text-sm font-medium text-slate-700">Name</label>
-            <input
-              type="text"
-              id="line-name"
-              value={lineName}
-              onChange={(e) => setLineName(e.target.value)}
-              className="mt-1 block w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-premium-red-500 sm:text-sm"
-              placeholder="e.g., iPhone Division"
-            />
+      <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">
+            {editingLine ? 'Edit Business Line' : 'Create New Business Line'}
+          </h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Business Line Name</label>
+              <input
+                type="text"
+                value={lineName}
+                onChange={(e) => setLineName(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-premium-red-500"
+                placeholder="Enter business line name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <textarea
+                value={lineDescription}
+                onChange={(e) => setLineDescription(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-premium-red-500"
+                placeholder="Enter business line description"
+                rows={3}
+              />
+            </div>
           </div>
-          <div>
-            <label htmlFor="line-context" className="block text-sm font-medium text-slate-700">Context for AI</label>
-            <textarea
-              id="line-context"
-              rows={4}
-              value={lineContext}
-              onChange={(e) => setLineContext(e.target.value)}
-              className="mt-1 block w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-premium-red-500 sm:text-sm"
-              placeholder="Describe the product, service, target audience, and key messaging."
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <button onClick={handleCloseModal} className="px-4 py-2 bg-slate-200 text-slate-800 text-sm font-medium rounded-lg hover:bg-slate-300/80">Cancel</button>
-            <button onClick={handleSaveLine} className="px-4 py-2 bg-premium-red-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-premium-red-700">Save</button>
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={handleCloseModal}
+              className="px-4 py-2 text-slate-600 hover:text-slate-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveLine}
+              disabled={isLoading || !lineName.trim() || !lineDescription.trim()}
+              className="px-4 py-2 bg-premium-red-600 text-white rounded-md hover:bg-premium-red-700 disabled:bg-slate-400 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Saving...' : editingLine ? 'Update' : 'Create'}
+            </button>
           </div>
         </div>
       </Modal>
