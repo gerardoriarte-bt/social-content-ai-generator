@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import type { AIParams, BusinessLine, ContentIdea } from '../types';
+import type { AIParams, BusinessLine, ContentIdea, Company } from '../types';
 
 const API_KEY = process.env.API_KEY;
 
@@ -39,8 +39,18 @@ const responseSchema = {
   },
 };
 
+// Helper to add unique IDs and clean up data
+const processIdeas = (ideas: any[]): ContentIdea[] => {
+    return ideas.map((idea: Omit<ContentIdea, 'id'>) => ({
+      ...idea,
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      hashtags: idea.hashtags.map(h => h.replace(/#/g, ''))
+    }));
+}
+
 
 export const generateContentIdeas = async (
+  company: Company,
   businessLine: BusinessLine,
   params: AIParams,
   objective: string
@@ -48,21 +58,26 @@ export const generateContentIdeas = async (
   try {
     const prompt = `
       You are an expert social media strategist.
-      Generate 5 creative and engaging content ideas for a business with the following context: "${businessLine.context}".
+      Your task is to generate 5 creative and engaging content ideas.
+
+      The context is for the company "${company.name}", specifically for their business line "${businessLine.name}".
+      Business Line Context: "${businessLine.context}".
       
-      The target social network is: ${params.socialNetwork}.
-      The desired content type is: ${params.contentType}.
       The main objective of this content campaign is: "${objective}".
 
-      The ideas must adhere to the following characteristics:
+      The ideas must be tailored for the following social network and content type:
+      - Target Social Network: ${params.socialNetwork}.
+      - Desired Content Type: ${params.contentType}.
+
+      The generated content must adhere to these specific characteristics:
       - Tone: ${params.tone}
       - Intention: ${params.intention}
       - Evoked Emotion: ${params.emotion}
       - Character/Persona: ${params.character}
 
-      For each idea, provide a 'rationale' explaining why it's a good fit based on the provided context, objective, and parameters.
+      For each idea, provide a 'rationale' that clearly explains why it aligns with the company, business line, objective, and all specified parameters.
 
-      Provide the output in the specified JSON format. Each idea must be unique and tailored to the provided context.
+      Provide the output in the specified JSON format. Ensure each idea is unique and directly relevant to the provided context.
     `;
 
     const response = await ai.models.generateContent({
@@ -77,14 +92,57 @@ export const generateContentIdeas = async (
     const jsonString = response.text.trim();
     const ideas = JSON.parse(jsonString);
 
-    // Minor cleanup of hashtags
-    return ideas.map((idea: ContentIdea) => ({
-      ...idea,
-      hashtags: idea.hashtags.map(h => h.replace(/#/g, ''))
-    }));
+    return processIdeas(ideas);
 
   } catch (error) {
     console.error("Error generating content ideas:", error);
     throw new Error("Failed to generate ideas from AI. Check the console for more details.");
   }
+};
+
+export const generateAlternativeIdeas = async (
+  originalIdea: ContentIdea,
+  company: Company,
+  businessLine: BusinessLine,
+  params: AIParams,
+  objective: string
+): Promise<ContentIdea[]> => {
+    try {
+        const prompt = `
+        You are an expert social media strategist.
+        Based on the following ORIGINAL idea:
+        - Title: "${originalIdea.title}"
+        - Description: "${originalIdea.description}"
+
+        Generate 3 creative and distinct ALTERNATIVES. These alternatives should maintain the core concept of the original idea but explore different angles, hooks, or calls to action.
+
+        The overall context for the company "${company.name}" and its business line "${businessLine.name}" remains the same:
+        - Business Context: "${businessLine.context}"
+        - Objective: "${objective}"
+        - Social Network: ${params.socialNetwork}
+        - Tone: ${params.tone}
+        - Intention: ${params.intention}
+
+        For each new alternative, provide a 'rationale' explaining how it offers a fresh perspective on the original idea while still aligning with the overall company and campaign goals.
+        Provide the output in the specified JSON format.
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: responseSchema,
+        },
+      });
+      
+      const jsonString = response.text.trim();
+      const ideas = JSON.parse(jsonString);
+  
+      return processIdeas(ideas);
+
+    } catch (error) {
+        console.error("Error generating alternative ideas:", error);
+        throw new Error("Failed to generate alternatives from AI. Check console for details.");
+    }
 };

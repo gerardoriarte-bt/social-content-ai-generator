@@ -1,143 +1,88 @@
-import React, { useState, useCallback } from 'react';
-import { CompanyManager } from './components/CompanyManager';
-import { BusinessLineManager } from './components/BusinessLineManager';
-import { IdeaGenerator } from './components/IdeaGenerator';
-import { IdeaRepository } from './components/IdeaRepository';
-import { Header } from './components/Header';
-import { Breadcrumb, BreadcrumbItem } from './components/Breadcrumb';
-import { getCompanies } from './services/dataService';
+import React, { useState, useEffect } from 'react';
 import { Login } from './components/Login';
-import { UserManager } from './components/UserManager';
-import { getCurrentUser, signOut } from './services/authService';
-import type { Company, BusinessLine, IdeaGroup, User } from './types';
+import { Header } from './components/Header';
+import { authService, User } from './services/authService';
 
-export type View = 'companies' | 'businessLines' | 'generator' | 'repository' | 'users';
+function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(getCurrentUser());
-  const [view, setView] = useState<View>('companies');
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [selectedBusinessLine, setSelectedBusinessLine] = useState<BusinessLine | null>(null);
-  const [existingIdeaGroup, setExistingIdeaGroup] = useState<IdeaGroup | null>(null);
+  useEffect(() => {
+    // Check if user is already authenticated on app load
+    const checkAuth = async () => {
+      try {
+        if (authService.isAuthenticated()) {
+          const user = await authService.getProfile();
+          setCurrentUser(user);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        // Clear invalid auth data
+        authService.logout();
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleLoginSuccess = (user: User) => {
+    checkAuth();
+  }, []);
+
+  const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setView('companies'); // Start at the main view after login
   };
 
-  const handleSignOut = () => {
-    signOut();
+  const handleLogout = () => {
     setCurrentUser(null);
-    // Reset state
-    setView('companies');
-    setSelectedCompany(null);
-    setSelectedBusinessLine(null);
-    setExistingIdeaGroup(null);
   };
 
-  const handleNavigate = useCallback((newView: View) => {
-    if (newView === 'companies') {
-      setSelectedCompany(null);
-      setSelectedBusinessLine(null);
-    }
-    // Only clear existing idea group if not navigating to repository or users
-    if (newView !== 'repository' && newView !== 'users') {
-        setExistingIdeaGroup(null);
-    }
-    setView(newView);
-  }, []);
-
-  const handleSelectCompany = useCallback((company: Company) => {
-    setSelectedCompany(company);
-    setSelectedBusinessLine(null);
-    setExistingIdeaGroup(null);
-    setView('businessLines');
-  }, []);
-
-  const handleStartGeneration = useCallback((company: Company, businessLine: BusinessLine) => {
-    setSelectedCompany(company);
-    setSelectedBusinessLine(businessLine);
-    setExistingIdeaGroup(null); // Ensure we are in creation mode
-    setView('generator');
-  }, []);
-
-  const handleGenerateMore = useCallback((group: IdeaGroup) => {
-    if (!currentUser) return;
-    const allCompanies = getCompanies(currentUser.id);
-    const company = allCompanies.find(c => c.id === group.companyId);
-    const businessLine = company?.businessLines.find(bl => bl.id === group.businessLineId);
-
-    if (company && businessLine) {
-        setSelectedCompany(company);
-        setSelectedBusinessLine(businessLine);
-        setExistingIdeaGroup(group);
-        setView('generator');
-    } else {
-        alert('Could not find the original Company or Business Line for this idea group. It may have been deleted.');
-    }
-  }, [currentUser]);
-
-  const buildBreadcrumbs = (): BreadcrumbItem[] => {
-    if (view === 'repository' || view === 'companies' || view === 'users') {
-        return [];
-    }
-
-    const items: BreadcrumbItem[] = [
-        { label: 'Companies', onClick: () => handleNavigate('companies') }
-    ];
-
-    if (selectedCompany) {
-        items.push({ 
-            label: selectedCompany.name, 
-            onClick: view === 'generator' ? () => handleSelectCompany(selectedCompany) : undefined 
-        });
-    }
-
-    if (selectedBusinessLine && view === 'generator') {
-        items.push({ label: selectedBusinessLine.name });
-    }
-    
-    return items;
-  };
-
-  if (!currentUser) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  const renderContent = () => {
-    switch (view) {
-      case 'companies':
-        return <CompanyManager onSelectCompany={handleSelectCompany} user={currentUser} />;
-      case 'businessLines':
-        if (selectedCompany) {
-          return <BusinessLineManager company={selectedCompany} onStartGeneration={handleStartGeneration} user={currentUser} />;
-        }
-        setView('companies');
-        return null;
-      case 'generator':
-        if (selectedCompany && selectedBusinessLine) {
-          return <IdeaGenerator company={selectedCompany} businessLine={selectedBusinessLine} existingGroup={existingIdeaGroup} user={currentUser} />;
-        }
-        setView('companies');
-        return null;
-      case 'repository':
-        return <IdeaRepository onGenerateMore={handleGenerateMore} user={currentUser} />;
-      case 'users':
-        return <UserManager />;
-      default:
-        return <CompanyManager onSelectCompany={handleSelectCompany} user={currentUser} />;
-    }
-  };
+  // Show login page if not authenticated
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} />;
+  }
 
+  // Show main app if authenticated
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      <Header user={currentUser} onSignOut={handleSignOut} currentView={view} onNavigate={handleNavigate} />
-      <main className="max-w-7xl mx-auto pt-40 pb-8 px-4 sm:px-6 lg:px-8">
-        <Breadcrumb items={buildBreadcrumbs()} />
-        {renderContent()}
+    <div className="min-h-screen bg-gray-50">
+      <Header currentUser={currentUser} onLogout={handleLogout} />
+      
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="border-4 border-dashed border-gray-200 rounded-lg p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Welcome, {currentUser.name}! 👋
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Your Social Content AI Generator is ready to help you create amazing content.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+              <h3 className="font-semibold text-blue-900 mb-2">Next Steps:</h3>
+              <ul className="text-sm text-blue-800 space-y-1 text-left">
+                <li>• Create your first company</li>
+                <li>• Add business lines</li>
+                <li>• Generate content ideas with AI</li>
+                <li>• Build your content repository</li>
+              </ul>
+            </div>
+            <p className="text-sm text-gray-500 mt-6">
+              Backend API is running and ready. Frontend will be updated with full functionality soon!
+            </p>
+          </div>
+        </div>
       </main>
     </div>
   );
-};
+}
 
 export default App;

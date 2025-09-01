@@ -3,6 +3,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import { initializeDatabase, closeDatabase } from './config/database';
+import authRoutes from './routes/auth';
+import companyRoutes from './routes/company';
+import ideaRoutes from './routes/ideas';
 
 // Load environment variables
 dotenv.config();
@@ -52,7 +56,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes (we'll add these later)
+// API routes
 app.get('/api', (req, res) => {
   res.json({ 
     message: 'Social Content AI API',
@@ -60,6 +64,15 @@ app.get('/api', (req, res) => {
     status: 'running'
   });
 });
+
+// Authentication routes
+app.use('/api/auth', authRoutes);
+
+// Company routes
+app.use('/api/companies', companyRoutes);
+
+// Idea routes
+app.use('/api/ideas', ideaRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -75,9 +88,38 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔗 API endpoint: http://localhost:${PORT}/api`);
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  await closeDatabase();
+  process.exit(0);
 });
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  await closeDatabase();
+  process.exit(0);
+});
+
+// Start server
+const startServer = async () => {
+  try {
+    // Initialize database
+    await initializeDatabase();
+    
+    // Start the server
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔗 API endpoint: http://localhost:${PORT}/api`);
+      console.log(`🔐 Auth endpoint: http://localhost:${PORT}/api/auth`);
+      console.log(`🏢 Company endpoint: http://localhost:${PORT}/api/companies`);
+      console.log(`💡 Idea endpoint: http://localhost:${PORT}/api/ideas`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

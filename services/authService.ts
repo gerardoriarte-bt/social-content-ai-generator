@@ -1,70 +1,293 @@
-import type { User } from '../types';
+// Frontend Authentication Service with JWT
+const API_BASE_URL = 'http://localhost:3001/api';
 
-const USERS_KEY = 'social_content_ai_users';
-const CURRENT_USER_KEY = 'social_content_ai_current_user';
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-// Create some default users if none exist
-const initializeDefaultUsers = () => {
-    const data = localStorage.getItem(USERS_KEY);
-    if (!data) {
-        const defaultUsers: User[] = [
-            { id: '1', name: 'Alice Johnson', email: 'alice@example.com', avatarUrl: `https://api.dicebear.com/8.x/adventurer/svg?seed=Alice` },
-            { id: '2', name: 'Bob Williams', email: 'bob@example.com', avatarUrl: `https://api.dicebear.com/8.x/adventurer/svg?seed=Bob` },
-        ];
-        localStorage.setItem(USERS_KEY, JSON.stringify(defaultUsers));
+export interface LoginData {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  avatarUrl: string;
+}
+
+export interface AuthResponse {
+  message: string;
+  user: User;
+  token: string;
+}
+
+class AuthService {
+  private token: string | null = null;
+  private user: User | null = null;
+
+  constructor() {
+    // Load token from localStorage on initialization
+    this.token = localStorage.getItem('authToken');
+    this.user = this.getUserFromStorage();
+  }
+
+  // Get stored user from localStorage
+  private getUserFromStorage(): User | null {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  }
+
+  // Store user data in localStorage
+  private storeUserData(user: User, token: string): void {
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    this.token = token;
+    this.user = user;
+  }
+
+  // Clear stored data
+  private clearStoredData(): void {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    this.token = null;
+    this.user = null;
+  }
+
+  // Get current token
+  getToken(): string | null {
+    return this.token;
+  }
+
+  // Get current user
+  getCurrentUser(): User | null {
+    return this.user;
+  }
+
+  // Check if user is authenticated
+  isAuthenticated(): boolean {
+    return !!this.token && !!this.user;
+  }
+
+  // Login user
+  async login(loginData: LoginData): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(loginData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Login failed');
+      }
+
+      const data: AuthResponse = await response.json();
+      this.storeUserData(data.user, data.token);
+      return data;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-};
+  }
 
-initializeDefaultUsers();
+  // Register user
+  async register(registerData: RegisterData): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(registerData),
+      });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Registration failed');
+      }
 
-// User CRUD
-export const getUsers = (): User[] => {
-    const data = localStorage.getItem(USERS_KEY);
-    return data ? JSON.parse(data) : [];
-};
-
-export const saveUsers = (users: User[]): void => {
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-};
-
-export const addUser = (user: Omit<User, 'id'>): User => {
-    const users = getUsers();
-    const newUser: User = { ...user, id: Date.now().toString() };
-    saveUsers([...users, newUser]);
-    return newUser;
-};
-
-export const updateUser = (updatedUser: User): void => {
-    const users = getUsers();
-    const userIndex = users.findIndex(u => u.id === updatedUser.id);
-    if (userIndex !== -1) {
-        users[userIndex] = updatedUser;
-        saveUsers(users);
+      const data: AuthResponse = await response.json();
+      this.storeUserData(data.user, data.token);
+      return data;
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
     }
-};
+  }
 
-export const deleteUser = (userId: string): void => {
-    const users = getUsers();
-    saveUsers(users.filter(u => u.id !== userId));
-};
-
-// Auth
-export const signIn = (userId: string): User | null => {
-    const users = getUsers();
-    const user = users.find(u => u.id === userId);
-    if (user) {
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-        return user;
+  // Logout user
+  async logout(): Promise<void> {
+    try {
+      if (this.token) {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      this.clearStoredData();
     }
-    return null;
-};
+  }
 
-export const signOut = (): void => {
-    localStorage.removeItem(CURRENT_USER_KEY);
-};
+  // Refresh token
+  async refreshToken(): Promise<string | null> {
+    try {
+      if (!this.token) return null;
 
-export const getCurrentUser = (): User | null => {
-    const data = localStorage.getItem(CURRENT_USER_KEY);
-    return data ? JSON.parse(data) : null;
-};
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Token refresh failed');
+      }
+
+      const data = await response.json();
+      this.token = data.token;
+      localStorage.setItem('authToken', data.token);
+      return data.token;
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      this.clearStoredData();
+      return null;
+    }
+  }
+
+  // Get user profile
+  async getProfile(): Promise<User> {
+    try {
+      if (!this.token) {
+        throw new Error('No authentication token');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token expired, try to refresh
+          const newToken = await this.refreshToken();
+          if (newToken) {
+            // Retry with new token
+            const retryResponse = await fetch(`${API_BASE_URL}/auth/profile`, {
+              headers: {
+                'Authorization': `Bearer ${newToken}`,
+              },
+            });
+            if (!retryResponse.ok) {
+              throw new Error('Failed to get profile');
+            }
+            const data = await retryResponse.json();
+            this.user = data.user;
+            localStorage.setItem('user', JSON.stringify(data.user));
+            return data.user;
+          }
+        }
+        throw new Error('Failed to get profile');
+      }
+
+      const data = await response.json();
+      this.user = data.user;
+      localStorage.setItem('user', JSON.stringify(data.user));
+      return data.user;
+    } catch (error) {
+      console.error('Get profile error:', error);
+      throw error;
+    }
+  }
+
+  // Update user profile
+  async updateProfile(updateData: Partial<User>): Promise<User> {
+    try {
+      if (!this.token) {
+        throw new Error('No authentication token');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Profile update failed');
+      }
+
+      const data = await response.json();
+      this.user = data.user;
+      localStorage.setItem('user', JSON.stringify(data.user));
+      return data.user;
+    } catch (error) {
+      console.error('Update profile error:', error);
+      throw error;
+    }
+  }
+
+  // Change password
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    try {
+      if (!this.token) {
+        throw new Error('No authentication token');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/password`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+          confirmNewPassword: newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Password change failed');
+      }
+    } catch (error) {
+      console.error('Change password error:', error);
+      throw error;
+    }
+  }
+
+  // Create headers with authentication
+  getAuthHeaders(): Record<string, string> {
+    return {
+      'Authorization': `Bearer ${this.token}`,
+      'Content-Type': 'application/json',
+    };
+  }
+}
+
+// Create singleton instance
+export const authService = new AuthService();

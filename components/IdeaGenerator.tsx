@@ -1,8 +1,9 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
-import { generateContentIdeas } from '../services/geminiService';
+import { generateContentIdeas, generateAlternativeIdeas } from '../services/geminiService';
 import { addIdeaGroup, updateIdeaGroup } from '../services/dataService';
 import type { Company, BusinessLine, ContentIdea, AIParams, IdeaGroup, User } from '../types';
-import { SparklesIcon, LightbulbIcon } from './icons';
+import { SparklesIcon, LightbulbIcon, ArrowPathIcon, SpinnerIcon } from './icons';
 
 interface IdeaGeneratorProps {
   company: Company;
@@ -60,13 +61,13 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
   const [groupName, setGroupName] = useState('');
   const [objective, setObjective] = useState('');
   const [generatedIdeas, setGeneratedIdeas] = useState<ContentIdea[]>([]);
-  const [selectedIdeas, setSelectedIdeas] = useState<Set<number>>(new Set());
+  const [selectedIdeas, setSelectedIdeas] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
+  const [iteratingIdeaId, setIteratingIdeaId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [visibleRationales, setVisibleRationales] = useState<Record<number, boolean>>({});
+  const [visibleRationales, setVisibleRationales] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    // When the prop changes (e.g., navigating from repository), reset the active group and form
     setActiveGroup(initialExistingGroup);
     
     if (initialExistingGroup) {
@@ -98,12 +99,32 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
     setSelectedIdeas(new Set());
     setVisibleRationales({});
     try {
-      const ideas = await generateContentIdeas(businessLine, params, objective);
+      const ideas = await generateContentIdeas(company, businessLine, params, objective);
       setGeneratedIdeas(ideas);
     } catch (err: any) {
       setError(err.message || 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleIterateIdea = async (e: React.MouseEvent, ideaToIterate: ContentIdea) => {
+    e.stopPropagation();
+    setIteratingIdeaId(ideaToIterate.id);
+    setError(null);
+    try {
+        const alternatives = await generateAlternativeIdeas(ideaToIterate, company, businessLine, params, objective);
+        setGeneratedIdeas(prevIdeas => 
+            prevIdeas.map(idea => 
+                idea.id === ideaToIterate.id 
+                    ? { ...idea, alternatives: [...(idea.alternatives || []), ...alternatives] } 
+                    : idea
+            )
+        );
+    } catch (err: any) {
+        setError(err.message || 'An unknown error occurred while iterating.');
+    } finally {
+        setIteratingIdeaId(null);
     }
   };
 
@@ -113,7 +134,19 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
         return;
     }
     
-    const ideasToSave = generatedIdeas.filter((_, index) => selectedIdeas.has(index));
+    const ideasToSave: ContentIdea[] = [];
+    const ideaFinder = (idea: ContentIdea) => {
+        if(selectedIdeas.has(idea.id)) {
+            // Create a clean copy without alternatives for saving
+            const { alternatives, ...ideaWithoutAlternatives } = idea;
+            ideasToSave.push(ideaWithoutAlternatives);
+        }
+        if(idea.alternatives) {
+            idea.alternatives.forEach(ideaFinder);
+        }
+    }
+    generatedIdeas.forEach(ideaFinder);
+
 
     if (activeGroup) {
         const updatedGroup: IdeaGroup = {
@@ -140,37 +173,106 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
         alert(`${ideasToSave.length} ideas saved successfully to a new group!`);
     }
     
-    // Clear the list of generated ideas for a clean slate
     setGeneratedIdeas([]);
     setSelectedIdeas(new Set());
   };
   
-  const toggleRationale = (e: React.MouseEvent, index: number) => {
+  const toggleRationale = (e: React.MouseEvent, ideaId: string) => {
     e.stopPropagation();
-    setVisibleRationales(prev => ({...prev, [index]: !prev[index]}));
+    setVisibleRationales(prev => ({...prev, [ideaId]: !prev[ideaId]}));
   };
 
-  const toggleIdeaSelection = (index: number) => {
+  const toggleIdeaSelection = (ideaId: string) => {
     setSelectedIdeas(prev => {
         const newSelection = new Set(prev);
-        if (newSelection.has(index)) {
-            newSelection.delete(index);
+        if (newSelection.has(ideaId)) {
+            newSelection.delete(ideaId);
         } else {
-            newSelection.add(index);
+            newSelection.add(ideaId);
         }
         return newSelection;
     });
   };
 
   const handleSelectAll = () => {
-    if (selectedIdeas.size === generatedIdeas.length) {
+    const allIdeaIds: string[] = [];
+    const collectIds = (ideas: ContentIdea[]) => {
+        ideas.forEach(idea => {
+            allIdeaIds.push(idea.id);
+            if (idea.alternatives) {
+                collectIds(idea.alternatives);
+            }
+        });
+    };
+    collectIds(generatedIdeas);
+
+    if (selectedIdeas.size === allIdeaIds.length) {
         setSelectedIdeas(new Set());
     } else {
-        const allIndices = new Set(generatedIdeas.map((_, i) => i));
-        setSelectedIdeas(allIndices);
+        setSelectedIdeas(new Set(allIdeaIds));
     }
   };
 
+  const IdeaCard: React.FC<{ idea: ContentIdea, isAlternative?: boolean }> = ({ idea, isAlternative = false }) => {
+    const isSelected = selectedIdeas.has(idea.id);
+    const isIterating = iteratingIdeaId === idea.id;
+    return (
+        <div 
+            onClick={() => toggleIdeaSelection(idea.id)}
+            className={`relative p-6 rounded-2xl shadow-md transition-all duration-200 cursor-pointer ${isSelected ? 'ring-2 ring-premium-red-500 shadow-lg' : 'hover:shadow-lg'} ${isAlternative ? 'bg-slate-50' : 'bg-white'}`}
+        >
+            <div className="flex justify-between items-start">
+                <h3 className="text-lg font-semibold text-premium-red-600 flex-1 pr-16">{idea.title}</h3>
+                <div className="absolute top-4 right-4 flex items-center gap-2">
+                    {!isAlternative && (
+                        <button 
+                            onClick={(e) => handleIterateIdea(e, idea)} 
+                            disabled={isIterating}
+                            className="p-1 text-slate-400 hover:text-premium-red-500 disabled:cursor-not-allowed" 
+                            title="Generate alternatives"
+                        >
+                           {isIterating ? <SpinnerIcon className="w-5 h-5"/> : <ArrowPathIcon className="w-5 h-5" />}
+                        </button>
+                    )}
+                    <button onClick={(e) => toggleRationale(e, idea.id)} className="p-1 text-slate-400 hover:text-premium-yellow-500" title="Show AI Rationale">
+                        <LightbulbIcon className="w-5 h-5" />
+                    </button>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${isSelected ? 'bg-premium-red-600' : 'bg-white border-2 border-slate-300'}`}>
+                        {isSelected && (
+                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <p className="mt-2 text-slate-700">{idea.description}</p>
+            {visibleRationales[idea.id] && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm font-semibold text-premium-yellow-800">AI Rationale:</p>
+                    <p className="mt-1 text-sm text-yellow-700">{idea.rationale}</p>
+                </div>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2">
+                {idea.hashtags.map(tag => (
+                    <span key={tag} className="px-2 py-1 bg-slate-200 text-slate-700 text-xs font-medium rounded-full">#{tag}</span>
+                ))}
+            </div>
+        </div>
+    )
+  }
+
+  const countAllIdeas = () => {
+    let count = 0;
+    const counter = (ideas: ContentIdea[]) => {
+        ideas.forEach(idea => {
+            count++;
+            if (idea.alternatives) counter(idea.alternatives);
+        });
+    };
+    counter(generatedIdeas);
+    return count;
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -207,7 +309,7 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
         
         {isLoading && (
             <div className="text-center p-10 bg-white rounded-2xl shadow-md">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-premium-red-600 mx-auto"></div>
+                <SpinnerIcon className="h-12 w-12 text-premium-red-600 mx-auto" />
                 <p className="mt-4 text-slate-700">AI is thinking... this may take a moment.</p>
             </div>
         )}
@@ -218,7 +320,7 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
                     <h2 className="text-2xl font-bold text-slate-900">Generated Ideas</h2>
                     <div className="flex items-center gap-4">
                         <button onClick={handleSelectAll} className="text-sm font-medium text-premium-red-600 hover:underline">
-                            {selectedIdeas.size === generatedIdeas.length ? 'Deselect All' : 'Select All'}
+                            {selectedIdeas.size === countAllIdeas() && countAllIdeas() > 0 ? 'Deselect All' : 'Select All'}
                         </button>
                         <button 
                             onClick={handleSaveIdeas} 
@@ -230,44 +332,16 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
                     </div>
                 </div>
                 <div className="space-y-4">
-                    {generatedIdeas.map((idea, index) => {
-                        const isSelected = selectedIdeas.has(index);
-                        return (
-                            <div 
-                                key={index} 
-                                onClick={() => toggleIdeaSelection(index)}
-                                className={`relative bg-white p-6 rounded-2xl shadow-md transition-all duration-200 cursor-pointer ${isSelected ? 'ring-2 ring-premium-red-500 shadow-lg' : 'hover:shadow-lg'}`}
-                            >
-                                <div className="flex justify-between items-start">
-                                    <h3 className="text-lg font-semibold text-premium-red-600 flex-1 pr-10">{idea.title}</h3>
-                                    <div className="absolute top-4 right-4 flex items-center gap-2">
-                                        <button onClick={(e) => toggleRationale(e, index)} className="p-1 text-slate-400 hover:text-premium-yellow-500" title="Show AI Rationale">
-                                            <LightbulbIcon className="w-5 h-5" />
-                                        </button>
-                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${isSelected ? 'bg-premium-red-600' : 'bg-white border-2 border-slate-300'}`}>
-                                            {isSelected && (
-                                                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            )}
-                                        </div>
-                                    </div>
+                    {generatedIdeas.map((idea) => (
+                       <React.Fragment key={idea.id}>
+                            <IdeaCard idea={idea} />
+                            {idea.alternatives && idea.alternatives.length > 0 && (
+                                <div className="ml-4 pl-4 border-l-2 border-slate-200 space-y-4">
+                                    {idea.alternatives.map(alt => <IdeaCard key={alt.id} idea={alt} isAlternative={true} />)}
                                 </div>
-                                <p className="mt-2 text-slate-700">{idea.description}</p>
-                                {visibleRationales[index] && (
-                                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                        <p className="text-sm font-semibold text-premium-yellow-800">AI Rationale:</p>
-                                        <p className="mt-1 text-sm text-yellow-700">{idea.rationale}</p>
-                                    </div>
-                                )}
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {idea.hashtags.map(tag => (
-                                        <span key={tag} className="px-2 py-1 bg-slate-200 text-slate-700 text-xs font-medium rounded-full">#{tag}</span>
-                                    ))}
-                                </div>
-                            </div>
-                        )
-                    })}
+                            )}
+                       </React.Fragment>
+                    ))}
                 </div>
             </div>
         )}
