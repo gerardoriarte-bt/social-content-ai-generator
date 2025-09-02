@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS companies (
     user_id VARCHAR(36) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_name (name)
+);
 
 -- Business lines table
 CREATE TABLE IF NOT EXISTS business_lines (
@@ -66,6 +70,10 @@ CREATE TABLE IF NOT EXISTS ai_params (
     character_type VARCHAR(100) NOT NULL,
     target_audience VARCHAR(100) NOT NULL,
     content_type VARCHAR(100) NOT NULL,
+    social_network VARCHAR(100),
+    content_format VARCHAR(100),
+    objective VARCHAR(100),
+    focus TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (business_line_id) REFERENCES business_lines(id) ON DELETE CASCADE,
@@ -75,14 +83,14 @@ CREATE TABLE IF NOT EXISTS ai_params (
 -- Content ideas table
 CREATE TABLE IF NOT EXISTS content_ideas (
     id VARCHAR(36) PRIMARY KEY,
-    idea_group_id VARCHAR(36) NOT NULL,
+    business_line_id VARCHAR(36) NOT NULL,
     title VARCHAR(500) NOT NULL,
     description TEXT NOT NULL,
     rationale TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (idea_group_id) REFERENCES idea_groups(id) ON DELETE CASCADE,
-    INDEX idx_idea_group_id (idea_group_id),
+    FOREIGN KEY (business_line_id) REFERENCES business_lines(id) ON DELETE CASCADE,
+    INDEX idx_business_line_id (business_line_id),
     INDEX idx_created_at (created_at)
 );
 
