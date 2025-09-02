@@ -1,6 +1,6 @@
 import { Company, BusinessLine, AIParams } from './types';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://3.17.189.224:3001/api';
 
 export class CompanyService {
   private static getAuthHeaders(): HeadersInit {

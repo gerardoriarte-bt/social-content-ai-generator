@@ -21,13 +21,11 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS companies (
     id VARCHAR(36) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    description TEXT,
+    industry VARCHAR(255),
     user_id VARCHAR(36) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
-    INDEX idx_name (name)
-);
 
 -- Business lines table
 CREATE TABLE IF NOT EXISTS business_lines (

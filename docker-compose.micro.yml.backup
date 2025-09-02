@@ -39,7 +39,7 @@ services:
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 100
     ports:
-      - "0.0.0.0:3001:3001"
+      - "127.0.0.1:3001:3001"
     depends_on:
       mysql:
         condition: service_healthy
