@@ -56,7 +56,28 @@ async function runMigrations() {
         const migrationPath = path.join(migrationsDir, filename);
         const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
         
-        await connection.execute(migrationSQL);
+        // Split SQL into individual statements and execute them one by one
+        const statements = migrationSQL
+          .split(';')
+          .map(stmt => stmt.trim())
+          .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+        
+        for (const statement of statements) {
+          if (statement.trim()) {
+            try {
+              await connection.execute(statement);
+            } catch (error) {
+              // Ignore duplicate column errors and other non-critical errors
+              if (error.code === 'ER_DUP_FIELDNAME' || 
+                  error.code === 'ER_DUP_KEYNAME' || 
+                  error.code === 'ER_DUP_ENTRY') {
+                console.log(`⚠️  Ignoring expected error: ${error.message}`);
+                continue;
+              }
+              throw error;
+            }
+          }
+        }
         
         // Record migration as executed
         await connection.execute(

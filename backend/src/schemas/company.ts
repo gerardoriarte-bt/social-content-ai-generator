@@ -3,13 +3,13 @@ import { z } from 'zod';
 // Company schemas
 export const createCompanySchema = z.object({
   name: z.string().min(2, 'Company name must be at least 2 characters').max(100, 'Company name too long'),
-  description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description too long'),
+  description: z.string().min(5, 'Description must be at least 5 characters').max(500, 'Description too long'),
   industry: z.string().min(2, 'Industry must be at least 2 characters').max(50, 'Industry too long'),
 });
 
 export const updateCompanySchema = z.object({
   name: z.string().min(2, 'Company name must be at least 2 characters').max(100, 'Company name too long').optional(),
-  description: z.string().min(10, 'Description must be at least 10 characters').max(500, 'Description too long').optional(),
+  description: z.string().min(5, 'Description must be at least 5 characters').max(500, 'Description too long').optional(),
   industry: z.string().min(2, 'Industry must be at least 2 characters').max(50, 'Industry too long').optional(),
 });
 

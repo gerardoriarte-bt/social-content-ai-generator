@@ -1,8 +1,8 @@
 # Use Node.js 20 Alpine for smaller image size
 FROM node:20-alpine
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl for health checks and mysql client
+RUN apk add --no-cache curl mysql-client
 
 # Set working directory
 WORKDIR /app
@@ -33,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 RUN chmod +x scripts/start.sh
 
 # Start the application with migrations
-CMD ["./scripts/start.sh"]
+CMD ["sh", "-c", "echo '🚀 Starting Social Content AI Backend...' && echo '🔄 Running database migrations...' && node scripts/run-migrations.js && echo '🚀 Starting application...' && npm start"]
