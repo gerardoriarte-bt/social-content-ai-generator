@@ -114,4 +114,4 @@ INSERT IGNORE INTO users (id, name, email, avatar_url) VALUES
 CREATE INDEX idx_companies_user_name ON companies(user_id, name);
 CREATE INDEX idx_business_lines_company_name ON business_lines(company_id, name);
 CREATE INDEX idx_idea_groups_company_business ON idea_groups(company_id, business_line_id);
-CREATE INDEX idx_content_ideas_group_created ON content_ideas(idea_group_id, created_at);
+CREATE INDEX idx_content_ideas_business_created ON content_ideas(business_line_id, created_at);

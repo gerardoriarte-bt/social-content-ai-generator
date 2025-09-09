@@ -1,5 +1,5 @@
 // Frontend Authentication Service with JWT
-const API_BASE_URL = 'http://3.17.189.224:3001/api';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 export interface User {
   id: string;
