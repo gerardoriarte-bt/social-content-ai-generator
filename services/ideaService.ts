@@ -1,6 +1,6 @@
 import { ContentIdea, AIParams } from './types';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = '/api';
 
 export class IdeaService {
   private static getAuthHeaders(): HeadersInit {
