@@ -150,7 +150,10 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
           {companies.map((company) => (
             <div 
               key={company.id} 
-              onClick={() => onCompanySelect(company)}
+              onClick={() => {
+                console.log('Card clicked for company:', company);
+                onCompanySelect(company);
+              }}
               className="group relative bg-white rounded-2xl shadow-md p-6 flex flex-col justify-between hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer"
             >
               <div>
@@ -192,6 +195,7 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
       )}
 
       {/* Business Line Manager for selected company */}
+      {console.log('Rendering CompanyManager, selectedCompany:', selectedCompany)}
       {selectedCompany && (
         <div className="mt-8">
           <div className="bg-white rounded-2xl shadow-md p-6">

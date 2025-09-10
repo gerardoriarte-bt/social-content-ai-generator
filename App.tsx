@@ -17,6 +17,11 @@ export default function App() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
+  const handleCompanySelect = (company: Company | null) => {
+    console.log('Company selected:', company);
+    setSelectedCompany(company);
+  };
+
   useEffect(() => {
     const loadCompanies = async () => {
       try {
@@ -65,7 +70,7 @@ export default function App() {
             companies={companies}
             selectedCompany={selectedCompany}
             onCompaniesUpdate={setCompanies}
-            onCompanySelect={setSelectedCompany}
+            onCompanySelect={handleCompanySelect}
           />
         </div>
       </main>
