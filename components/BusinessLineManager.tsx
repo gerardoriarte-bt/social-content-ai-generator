@@ -11,6 +11,7 @@ interface BusinessLineManagerProps {
 }
 
 export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ company, onBusinessLineSelect, onBusinessLinesUpdate }) => {
+  console.log('BusinessLineManager: Rendering for company:', company.name);
   const [currentCompany, setCurrentCompany] = useState<Company>(company);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLine, setEditingLine] = useState<BusinessLine | null>(null);
@@ -258,3 +259,5 @@ export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ compan
     </div>
   );
 };
+
+console.log('BusinessLineManager: Component definition complete');
