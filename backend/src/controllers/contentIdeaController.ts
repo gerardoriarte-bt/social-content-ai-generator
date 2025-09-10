@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { validate } from '../middleware/validation';
-import { authenticateToken } from '../middleware/auth';
+// import { authenticateToken } from '../middleware/auth';
 import { createContentIdeaSchema, updateContentIdeaSchema } from '../schemas/company';
 import { ContentIdeaModel } from '../models/ContentIdea';
 import { CompanyModel } from '../models/Company';
@@ -10,20 +10,21 @@ export class ContentIdeaController {
   // Get all content ideas for a business line
   static getContentIdeas = async (req: Request, res: Response) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({
-          error: 'Authentication required',
-        });
-      }
+      // Skip authentication for now
+      // if (!req.user) {
+      //   return res.status(401).json({
+      //     error: 'Authentication required',
+      //   });
+      // }
 
       const { companyId, businessLineId } = req.params;
 
-      // Check if company belongs to user
-      if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
-        return res.status(403).json({
-          error: 'Access denied',
-        });
-      }
+      // Skip user ownership check for now
+      // if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
+      //   return res.status(403).json({
+      //     error: 'Access denied',
+      //   });
+      // }
 
       // Check if business line belongs to company
       if (!(await BusinessLineModel.belongsToCompany(businessLineId, companyId))) {

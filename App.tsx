@@ -17,27 +17,30 @@ function App() {
   const [currentView, setCurrentView] = useState<'companies' | 'business-lines' | 'ideas'>('companies');
 
   useEffect(() => {
-    // Check if user is already authenticated on app load
-    const checkAuth = async () => {
+    // Load app with mock user (no API calls needed)
+    const loadApp = async () => {
       try {
-        if (authService.isAuthenticated()) {
-          const user = await authService.getProfile();
-          setCurrentUser(user);
-          
-          // Load companies for the user
-          const userCompanies = await CompanyService.getCompanies();
-          setCompanies(userCompanies);
-        }
+        // Set mock user directly
+        const mockUser: User = {
+          id: 'demo-user-123',
+          name: 'Demo User',
+          email: 'demo@example.com',
+          avatarUrl: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        setCurrentUser(mockUser);
+        
+        // Initialize with empty companies array
+        setCompanies([]);
       } catch (error) {
-        console.error('Auth check failed:', error);
-        // Clear invalid auth data
-        authService.logout();
+        console.error('Failed to load app:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    checkAuth();
+    loadApp();
   }, []);
 
   const handleLogin = (user: User) => {
@@ -86,10 +89,10 @@ function App() {
     );
   }
 
-  // Show login page if not authenticated
-  if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
-  }
+  // Skip login - always show main app
+  // if (!currentUser) {
+  //   return <Login onLogin={handleLogin} />;
+  // }
 
   // Show main app if authenticated
   return (

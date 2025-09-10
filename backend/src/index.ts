@@ -13,7 +13,7 @@ import contentIdeaRoutes from './routes/contentIdeas';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Security middleware
 app.use(helmet());
@@ -63,6 +63,22 @@ app.get('/api', (req, res) => {
     message: 'Social Content AI API',
     version: '1.0.0',
     status: 'running'
+  });
+});
+
+// Test route without authentication
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'Test route works without authentication',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Test companies route without authentication
+app.get('/api/test-companies', (req, res) => {
+  res.json({ 
+    companies: [],
+    message: 'Test companies route works without authentication'
   });
 });
 

@@ -21,45 +21,18 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
-// Middleware to authenticate JWT token
+// Middleware to authenticate JWT token - DISABLED FOR DEMO
 export const authenticateToken = async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = JWTService.extractTokenFromHeader(authHeader);
-
-    if (!token) {
-      res.status(401).json({ error: 'Access token required' });
-      return;
-    }
-
-    const payload = JWTService.verifyToken(token);
-    if (!payload) {
-      res.status(401).json({ error: 'Invalid or expired token' });
-      return;
-    }
-
-    // Check if user still exists in database
-    const user = await UserModel.findById(payload.userId);
-    if (!user) {
-      res.status(401).json({ error: 'User not found' });
-      return;
-    }
-
-    // Add user info to request
-    req.user = {
-      userId: payload.userId,
-      email: payload.email,
-    };
-
-    next();
-  } catch (error) {
-    console.error('Authentication error:', error);
-    res.status(500).json({ error: 'Authentication failed' });
-  }
+  // Always set demo user for demo purposes
+  req.user = {
+    userId: 'demo-user-123',
+    email: 'demo@example.com',
+  };
+  next();
 };
 
 // Middleware to check if user is authenticated (optional)
