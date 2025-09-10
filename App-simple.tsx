@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, Company } from './types';
 import { CompanyManager } from './components/CompanyManager';
 import { Header } from './components/Header';
-import { CompanyService } from './services/companyService';
 
 export default function App() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [currentUser] = useState<User>({
     id: 'demo-user-123',
     name: 'Demo User',
@@ -16,21 +15,6 @@ export default function App() {
   });
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-
-  useEffect(() => {
-    const loadCompanies = async () => {
-      try {
-        const userCompanies = await CompanyService.getCompanies();
-        setCompanies(userCompanies);
-      } catch (error) {
-        console.error('Failed to load companies:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCompanies();
-  }, []);
 
   if (loading) {
     return (

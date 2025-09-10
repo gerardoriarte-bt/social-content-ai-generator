@@ -4,10 +4,8 @@ const API_BASE_URL = '/api';
 
 export class CompanyService {
   private static getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('authToken');
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     };
   }
 
