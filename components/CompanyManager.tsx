@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CompanyService } from '../services/companyService';
-import type { Company } from '../types';
+import type { Company, BusinessLine } from '../types';
 import { Modal } from './Modal';
+import { BusinessLineManager } from './BusinessLineManager';
 import { PlusIcon, PencilIcon, TrashIcon, ChevronRightIcon } from './icons';
 
 interface CompanyManagerProps {
   companies: Company[];
+  selectedCompany: Company | null;
   onCompanySelect: (company: Company) => void;
   onCompaniesUpdate: (companies: Company[]) => void;
 }
@@ -20,7 +22,7 @@ const AddCompanyCard: React.FC<{ onClick: () => void }> = ({ onClick }) => (
   </button>
 );
 
-export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, onCompanySelect, onCompaniesUpdate }) => {
+export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selectedCompany, onCompanySelect, onCompaniesUpdate }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [companyName, setCompanyName] = useState('');
@@ -55,6 +57,18 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, onCom
     setCompanyIndustry('');
     setError(null);
     setSuccess(null);
+  }, []);
+
+  const handleBusinessLinesUpdate = useCallback((updatedCompany: Company) => {
+    const updatedCompanies = companies.map(c => 
+      c.id === updatedCompany.id ? updatedCompany : c
+    );
+    onCompaniesUpdate(updatedCompanies);
+  }, [companies, onCompaniesUpdate]);
+
+  const handleBusinessLineSelect = useCallback((businessLine: BusinessLine) => {
+    // Handle business line selection if needed
+    console.log('Selected business line:', businessLine);
   }, []);
 
   const handleSaveCompany = useCallback(async () => {
@@ -173,6 +187,31 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, onCom
                 Create Your First Company
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Business Line Manager for selected company */}
+      {selectedCompany && (
+        <div className="mt-8">
+          <div className="bg-white rounded-2xl shadow-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">Business Lines for {selectedCompany.name}</h2>
+                <p className="text-sm text-slate-600 mt-1">Manage business lines for content generation</p>
+              </div>
+              <button
+                onClick={() => onCompanySelect(null)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 text-sm font-medium"
+              >
+                ← Back to Companies
+              </button>
+            </div>
+            <BusinessLineManager
+              company={selectedCompany}
+              onBusinessLineSelect={handleBusinessLineSelect}
+              onBusinessLinesUpdate={handleBusinessLinesUpdate}
+            />
           </div>
         </div>
       )}

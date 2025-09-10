@@ -64,7 +64,7 @@ export default function App() {
           <CompanyManager
             companies={companies}
             selectedCompany={selectedCompany}
-            onCompaniesChange={setCompanies}
+            onCompaniesUpdate={setCompanies}
             onCompanySelect={setSelectedCompany}
           />
         </div>
