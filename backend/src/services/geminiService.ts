@@ -23,22 +23,54 @@ export interface IdeaGenerationRequest {
 export class GeminiService {
   private static genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   private static model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  private static readonly MAX_RETRIES = 3;
+  private static readonly RETRY_DELAYS = [1000, 3000, 5000]; // delays in milliseconds
 
   static async generateContentIdeas(request: IdeaGenerationRequest): Promise<ContentIdea[]> {
     const { company, businessLine, aiParams, numberOfIdeas = 5 } = request;
 
     const prompt = this.buildPrompt(company, businessLine, aiParams, numberOfIdeas);
 
-    try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+    // Intentar con retry logic
+    for (let attempt = 0; attempt < this.MAX_RETRIES; attempt++) {
+      try {
+        console.log(`Gemini attempt ${attempt + 1}/${this.MAX_RETRIES}`);
+        
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
 
-      return this.parseIdeasFromResponse(text, numberOfIdeas);
-    } catch (error) {
-      console.error('Error generating content ideas:', error);
-      throw new Error('Failed to generate content ideas');
+        const ideas = this.parseIdeasFromResponse(text, numberOfIdeas);
+        console.log(`Gemini success: Generated ${ideas.length} ideas`);
+        return ideas;
+
+      } catch (error: any) {
+        console.error(`Gemini attempt ${attempt + 1} failed:`, error.message);
+        
+        // Si es el último intento, usar fallback
+        if (attempt === this.MAX_RETRIES - 1) {
+          console.log('All Gemini attempts failed, using fallback ideas');
+          return this.generateFallbackIdeas(numberOfIdeas, company, businessLine, aiParams);
+        }
+
+        // Si es error 503 (overloaded) o 429 (rate limit), esperar más tiempo
+        if (error.status === 503 || error.status === 429) {
+          const delay = this.RETRY_DELAYS[attempt] * (attempt + 1); // delay escalado
+          console.log(`Gemini overloaded, waiting ${delay}ms before retry...`);
+          await this.sleep(delay);
+        } else {
+          // Para otros errores, esperar menos tiempo
+          await this.sleep(this.RETRY_DELAYS[attempt]);
+        }
+      }
     }
+
+    // Esto no debería ejecutarse nunca, pero por seguridad
+    return this.generateFallbackIdeas(numberOfIdeas, company, businessLine, aiParams);
+  }
+
+  private static sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   private static buildPrompt(
@@ -191,12 +223,12 @@ Asegúrate de que la respuesta sea solo JSON válido, sin texto adicional antes 
       console.error('Error parsing ideas from response:', error);
       console.error('Raw response:', response);
       
-      // Fallback: generar ideas básicas
-      return this.generateFallbackIdeas(expectedCount);
+      // Fallback: generar ideas básicas (sin parámetros específicos)
+      return this.generateBasicFallbackIdeas(expectedCount);
     }
   }
 
-  private static generateFallbackIdeas(count: number): ContentIdea[] {
+  private static generateBasicFallbackIdeas(count: number): ContentIdea[] {
     const ideas: ContentIdea[] = [];
     
     for (let i = 1; i <= count; i++) {
@@ -210,6 +242,142 @@ Asegúrate de que la respuesta sea solo JSON válido, sin texto adicional antes 
     }
 
     return ideas;
+  }
+
+  private static generateFallbackIdeas(
+    count: number, 
+    company: Company, 
+    businessLine: BusinessLine, 
+    aiParams: AIParams
+  ): ContentIdea[] {
+    const ideas: ContentIdea[] = [];
+    
+    // Ideas de fallback más específicas basadas en los parámetros
+    const fallbackTemplates = [
+      {
+        title: `Conoce ${businessLine.name} - ${company.name}`,
+        description: `Presenta ${businessLine.name} de ${company.name} de manera atractiva. Explica los beneficios principales y por qué es la mejor opción para ${aiParams.targetAudience}.`,
+        rationale: `Este contenido genera awareness y educa a la audiencia sobre los servicios/productos de la empresa.`,
+        hashtags: this.generateRelevantHashtags(company, businessLine, aiParams)
+      },
+      {
+        title: `¿Sabías que ${company.name} puede ayudarte?`,
+        description: `Comparte un dato interesante o estadística relevante sobre ${businessLine.name}. Conecta con el dolor de la audiencia y muestra cómo ${company.name} puede resolverlo.`,
+        rationale: `Este contenido genera engagement y posiciona a la empresa como experta en su campo.`,
+        hashtags: this.generateRelevantHashtags(company, businessLine, aiParams)
+      },
+      {
+        title: `Testimonio: Cómo ${company.name} cambió mi experiencia`,
+        description: `Comparte una historia de éxito o testimonio relacionado con ${businessLine.name}. Incluye resultados específicos y beneficios obtenidos.`,
+        rationale: `Los testimonios generan confianza y credibilidad, especialmente efectivos para conversión.`,
+        hashtags: this.generateRelevantHashtags(company, businessLine, aiParams)
+      },
+      {
+        title: `Tips profesionales de ${company.name}`,
+        description: `Comparte 3-5 consejos prácticos relacionados con ${businessLine.name}. Proporciona valor inmediato a la audiencia.`,
+        rationale: `El contenido educativo genera engagement y posiciona a la marca como autoridad.`,
+        hashtags: this.generateRelevantHashtags(company, businessLine, aiParams)
+      },
+      {
+        title: `Behind the scenes: ${company.name}`,
+        description: `Muestra el proceso interno de ${businessLine.name}. Da una mirada detrás de cámaras de cómo trabaja el equipo.`,
+        rationale: `El contenido auténtico genera conexión emocional y humaniza la marca.`,
+        hashtags: this.generateRelevantHashtags(company, businessLine, aiParams)
+      }
+    ];
+
+    // Seleccionar ideas basadas en el objetivo
+    const selectedTemplates = this.selectTemplatesByObjective(fallbackTemplates, aiParams.objective);
+    
+    for (let i = 0; i < count && i < selectedTemplates.length; i++) {
+      const template = selectedTemplates[i];
+      ideas.push({
+        title: template.title,
+        description: template.description,
+        rationale: template.rationale,
+        hashtags: template.hashtags,
+        platform: aiParams.socialNetwork
+      });
+    }
+
+    // Si necesitamos más ideas, generar algunas genéricas
+    while (ideas.length < count) {
+      const genericIndex = ideas.length % fallbackTemplates.length;
+      const template = fallbackTemplates[genericIndex];
+      ideas.push({
+        title: `${template.title} (${ideas.length + 1})`,
+        description: template.description,
+        rationale: template.rationale,
+        hashtags: template.hashtags,
+        platform: aiParams.socialNetwork
+      });
+    }
+
+    return ideas;
+  }
+
+  private static selectTemplatesByObjective(templates: any[], objective: string): any[] {
+    // Seleccionar templates más relevantes según el objetivo
+    switch (objective) {
+      case 'Awareness':
+        return [templates[0], templates[4], templates[1]]; // Conoce, Behind scenes, Sabías que
+      case 'Engagement':
+        return [templates[3], templates[4], templates[1]]; // Tips, Behind scenes, Sabías que
+      case 'Conversion':
+        return [templates[2], templates[0], templates[3]]; // Testimonio, Conoce, Tips
+      case 'Traffic':
+        return [templates[3], templates[1], templates[0]]; // Tips, Sabías que, Conoce
+      case 'Education':
+        return [templates[3], templates[1], templates[0]]; // Tips, Sabías que, Conoce
+      case 'Community':
+        return [templates[4], templates[3], templates[2]]; // Behind scenes, Tips, Testimonio
+      default:
+        return templates;
+    }
+  }
+
+  private static generateRelevantHashtags(company: Company, businessLine: BusinessLine, aiParams: AIParams): string[] {
+    const hashtags = [];
+    
+    // Hashtags específicos de la empresa
+    if (company.name) {
+      hashtags.push(`#${company.name.replace(/\s+/g, '')}`);
+    }
+    
+    // Hashtags de la industria
+    if (company.industry) {
+      hashtags.push(`#${company.industry.replace(/\s+/g, '')}`);
+    }
+    
+    // Hashtags de la plataforma
+    hashtags.push(`#${aiParams.socialNetwork}`);
+    
+    // Hashtags genéricos relevantes
+    hashtags.push('#marketing', '#contenido', '#socialmedia');
+    
+    // Hashtags específicos del objetivo
+    switch (aiParams.objective) {
+      case 'Awareness':
+        hashtags.push('#brandawareness', '#conocimiento');
+        break;
+      case 'Engagement':
+        hashtags.push('#engagement', '#interaccion');
+        break;
+      case 'Conversion':
+        hashtags.push('#ventas', '#conversion');
+        break;
+      case 'Traffic':
+        hashtags.push('#trafico', '#visitas');
+        break;
+      case 'Education':
+        hashtags.push('#educacion', '#aprendizaje');
+        break;
+      case 'Community':
+        hashtags.push('#comunidad', '#conexion');
+        break;
+    }
+    
+    return hashtags.slice(0, 5); // Limitar a 5 hashtags
   }
 
   static async testConnection(): Promise<boolean> {

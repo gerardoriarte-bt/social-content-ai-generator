@@ -50,23 +50,31 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
     setError(null);
 
     try {
+      console.log('Generating ideas with retry logic...');
       const ideas = await IdeaService.generateIdeas(company.id, businessLine.id, numberOfIdeas);
       setGeneratedIdeas(ideas);
       onIdeasGenerated?.(ideas);
+      
+      // Si llegamos aquí, la generación fue exitosa
+      console.log(`Successfully generated ${ideas.length} ideas`);
+      
     } catch (error) {
       console.error('Error generating ideas:', error);
       
       // Handle specific Gemini errors
       if (error instanceof Error) {
         if (error.message.includes('503') || error.message.includes('overloaded')) {
-          setError('Gemini AI está experimentando alta demanda. Por favor, intenta de nuevo en unos minutos.');
+          setError('⚠️ Gemini AI está experimentando alta demanda. Se han generado ideas de respaldo automáticamente. Puedes intentar de nuevo más tarde para obtener ideas personalizadas.');
+          setIsGeminiConnected(false);
         } else if (error.message.includes('429')) {
-          setError('Se ha excedido el límite de solicitudes. Por favor, espera un momento antes de intentar de nuevo.');
+          setError('⏰ Se ha excedido el límite de solicitudes. Por favor, espera un momento antes de intentar de nuevo.');
+        } else if (error.message.includes('Failed to generate content ideas')) {
+          setError('🔄 Se generaron ideas de respaldo debido a problemas temporales con la IA. Las ideas siguen siendo relevantes para tu negocio.');
         } else {
-          setError(`Error al generar ideas: ${error.message}`);
+          setError(`❌ Error al generar ideas: ${error.message}`);
         }
       } else {
-        setError('Error inesperado al generar ideas. Por favor, intenta de nuevo.');
+        setError('❌ Error inesperado al generar ideas. Por favor, intenta de nuevo.');
       }
     } finally {
       setIsGenerating(false);
@@ -85,9 +93,9 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
           Generar Ideas con IA
         </h2>
         <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${isGeminiConnected === null ? 'bg-yellow-400' : isGeminiConnected ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+          <div className={`w-3 h-3 rounded-full ${isGeminiConnected === null ? 'bg-yellow-400' : isGeminiConnected ? 'bg-green-400' : 'bg-orange-400'}`}></div>
           <span className="text-sm text-gray-600">
-            {isGeminiConnected === null ? 'Conectando...' : isGeminiConnected ? 'Gemini AI Conectado' : 'Gemini AI con alta demanda - Intenta más tarde'}
+            {isGeminiConnected === null ? 'Conectando...' : isGeminiConnected ? 'Gemini AI Conectado' : 'Gemini AI con alta demanda - Usando ideas de respaldo'}
           </span>
         </div>
       </div>
@@ -179,7 +187,7 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
             isGenerating || !aiParams
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : isGeminiConnected === false
-              ? 'bg-yellow-600 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2'
+              ? 'bg-orange-600 text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2'
               : 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
           }`}
         >
@@ -189,9 +197,9 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
               Generando ideas...
             </div>
           ) : isGeminiConnected === false ? (
-            'Intentar Generar Ideas (Alta Demanda)'
+            '🔄 Generar Ideas (Con Respaldo Automático)'
           ) : (
-            'Generar Ideas con IA'
+            '🚀 Generar Ideas con IA'
           )}
         </button>
       </div>
