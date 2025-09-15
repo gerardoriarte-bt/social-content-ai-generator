@@ -17,7 +17,11 @@ export class CompanyController {
       // }
 
       // Use a mock user ID for now
+<<<<<<< HEAD
       const mockUserId = 'demo-user-123';
+=======
+      const mockUserId = 'mock-user-123';
+>>>>>>> e8b71bea3a41f13cbb7b3c7bc4183c8b1a94b447
       const companies = await CompanyModel.findByUserIdWithBusinessLines(mockUserId);
 
       return res.json({
@@ -86,7 +90,11 @@ export class CompanyController {
           name,
           description,
           industry,
+<<<<<<< HEAD
           userId: 'demo-user-123', // Use mock user ID
+=======
+          userId: 'mock-user-123', // Use mock user ID
+>>>>>>> e8b71bea3a41f13cbb7b3c7bc4183c8b1a94b447
         });
 
         return res.status(201).json({
@@ -373,20 +381,21 @@ export class CompanyController {
   // Get AI params for a business line
   static getAIParams = async (req: Request, res: Response) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({
-          error: 'Authentication required',
-        });
-      }
+      // Skip authentication for now
+      // if (!req.user) {
+      //   return res.status(401).json({
+      //     error: 'Authentication required',
+      //   });
+      // }
 
       const { companyId, businessLineId } = req.params;
 
-      // Check if company belongs to user
-      if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
-        return res.status(403).json({
-          error: 'Access denied',
-        });
-      }
+      // Skip user ownership check for now
+      // if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
+      //   return res.status(403).json({
+      //     error: 'Access denied',
+      //   });
+      // }
 
       // Check if business line belongs to company
       if (!(await BusinessLineModel.belongsToCompany(businessLineId, companyId))) {
@@ -413,21 +422,22 @@ export class CompanyController {
     validate(createAIParamsSchema),
     async (req: Request, res: Response) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({
-            error: 'Authentication required',
-          });
-        }
+        // Skip authentication for now
+        // if (!req.user) {
+        //   return res.status(401).json({
+        //     error: 'Authentication required',
+        //   });
+        // }
 
         const { companyId, businessLineId } = req.params;
         const { tone, characterType, targetAudience, contentType, socialNetwork, contentFormat, objective, focus } = req.body;
 
-        // Check if company belongs to user
-        if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
-          return res.status(403).json({
-            error: 'Access denied',
-          });
-        }
+        // Skip user ownership check for now
+        // if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
+        //   return res.status(403).json({
+        //     error: 'Access denied',
+        //   });
+        // }
 
         // Check if business line belongs to company
         if (!(await BusinessLineModel.belongsToCompany(businessLineId, companyId))) {
@@ -474,21 +484,22 @@ export class CompanyController {
     validate(updateAIParamsSchema),
     async (req: Request, res: Response) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({
-            error: 'Authentication required',
-          });
-        }
+        // Skip authentication for now
+        // if (!req.user) {
+        //   return res.status(401).json({
+        //     error: 'Authentication required',
+        //   });
+        // }
 
         const { companyId, businessLineId, aiParamsId } = req.params;
         const { tone, characterType, targetAudience, contentType, socialNetwork, contentFormat, objective, focus } = req.body;
 
-        // Check if company belongs to user
-        if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
-          return res.status(403).json({
-            error: 'Access denied',
-          });
-        }
+        // Skip user ownership check for now
+        // if (!(await CompanyModel.belongsToUser(companyId, req.user.userId))) {
+        //   return res.status(403).json({
+        //     error: 'Access denied',
+        //   });
+        // }
 
         // Check if business line belongs to company
         if (!(await BusinessLineModel.belongsToCompany(businessLineId, companyId))) {

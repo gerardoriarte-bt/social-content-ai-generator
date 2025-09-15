@@ -58,6 +58,7 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
     setCompanyIndustry('');
     setError(null);
     setSuccess(null);
+<<<<<<< HEAD
   }, []);
 
   const handleBusinessLinesUpdate = useCallback((updatedCompany: Company) => {
@@ -70,7 +71,10 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
   const handleBusinessLineSelect = useCallback((businessLine: BusinessLine) => {
     // Handle business line selection if needed
     console.log('Selected business line:', businessLine);
+=======
+>>>>>>> e8b71bea3a41f13cbb7b3c7bc4183c8b1a94b447
   }, []);
+
 
   const handleSaveCompany = useCallback(async () => {
     if (!companyName.trim() || !companyDescription.trim() || !companyIndustry.trim()) return;
@@ -171,7 +175,7 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
                 </button>
               </div>
               <div className="flex items-center justify-between mt-4">
-                <span className="text-sm text-slate-500">Click to view business lines</span>
+                <span className="text-sm text-slate-500">Click to manage business lines</span>
                 <ChevronRightIcon className="w-5 h-5 text-slate-400 group-hover:text-premium-red-500 transition-colors" />
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { Company, BusinessLine, AIParams } from './types';
+import { Company, BusinessLine, AIParams } from '../types';
 
 const API_BASE_URL = '/api';
 

@@ -831,3 +831,7 @@ Evolucionar la aplicación desde su estado actual hasta una plataforma robusta, 
 *Plan técnico actualizado el 10 de Septiembre, 2025*
 *Próxima revisión: 10 de Octubre, 2025*
 *Responsable: CTO + Lead Developers*
+<<<<<<< HEAD
+=======
+
+>>>>>>> e8b71bea3a41f13cbb7b3c7bc4183c8b1a94b447
