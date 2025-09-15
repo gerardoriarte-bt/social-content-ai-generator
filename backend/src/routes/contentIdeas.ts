@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { ContentIdeaController } from '../controllers/contentIdeaController';
-import { authenticateToken } from '../middleware/auth';
+// import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
-// Apply authentication middleware to all routes
-router.use(authenticateToken);
+// Skip authentication for now
+// router.use(authenticateToken);
 
 // Content idea routes
 router.get('/:companyId/business-lines/:businessLineId/content-ideas', ContentIdeaController.getContentIdeas);
