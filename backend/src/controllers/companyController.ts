@@ -17,11 +17,7 @@ export class CompanyController {
       // }
 
       // Use a mock user ID for now
-<<<<<<< HEAD
       const mockUserId = 'demo-user-123';
-=======
-      const mockUserId = 'mock-user-123';
->>>>>>> e8b71bea3a41f13cbb7b3c7bc4183c8b1a94b447
       const companies = await CompanyModel.findByUserIdWithBusinessLines(mockUserId);
 
       return res.json({
@@ -90,11 +86,7 @@ export class CompanyController {
           name,
           description,
           industry,
-<<<<<<< HEAD
-          userId: 'demo-user-123', // Use mock user ID
-=======
           userId: 'mock-user-123', // Use mock user ID
->>>>>>> e8b71bea3a41f13cbb7b3c7bc4183c8b1a94b447
         });
 
         return res.status(201).json({

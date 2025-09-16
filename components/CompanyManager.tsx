@@ -58,7 +58,6 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
     setCompanyIndustry('');
     setError(null);
     setSuccess(null);
-<<<<<<< HEAD
   }, []);
 
   const handleBusinessLinesUpdate = useCallback((updatedCompany: Company) => {
@@ -71,8 +70,6 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
   const handleBusinessLineSelect = useCallback((businessLine: BusinessLine) => {
     // Handle business line selection if needed
     console.log('Selected business line:', businessLine);
-=======
->>>>>>> e8b71bea3a41f13cbb7b3c7bc4183c8b1a94b447
   }, []);
 
 
