@@ -235,8 +235,10 @@ export const AIProviderSelector: React.FC<AIProviderSelectorProps> = ({
 
         <Alert severity="info" sx={{ mt: 2 }}>
           <Typography variant="body2">
-            <strong>Nota:</strong> OpenAI GPT está configurado y listo para usar. 
-            Gemini también está disponible como respaldo.
+            <strong>Proveedor Seleccionado:</strong> {providerConfig[selectedProvider].name} - {providerConfig[selectedProvider].description}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            <strong>Nota:</strong> Todas las ideas generadas mostrarán claramente qué modelo de IA las creó y respetarán estrictamente los parámetros configurados.
           </Typography>
         </Alert>
       </CardContent>
