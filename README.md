@@ -190,3 +190,64 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
   <p>Made with ❤️ by <a href="https://github.com/gerardoriarte-bt">Gerardo Riarte</a></p>
   <p>⭐ Star this repository if you found it helpful!</p>
 </div>
+
+## 🤖 Multi-Provider AI Support
+
+The application now supports multiple AI providers for content generation:
+
+### Supported Providers
+
+- **🟦 Google Gemini** - Advanced AI model by Google (default)
+- **🟢 OpenAI GPT** - Powerful conversational AI by OpenAI
+- **🟠 Anthropic Claude** - Advanced AI assistant by Anthropic
+
+### Configuration
+
+To use different AI providers, configure the following environment variables:
+
+```bash
+# Gemini (already configured)
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-1.5-flash
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4
+
+# Claude
+CLAUDE_API_KEY=your_claude_api_key
+CLAUDE_MODEL=claude-3-sonnet-20240229
+```
+
+### Features
+
+- **Provider Selection**: Choose your preferred AI provider in the interface
+- **Connection Testing**: Test connectivity to each provider
+- **Automatic Fallback**: System falls back to backup ideas if providers fail
+- **Retry Logic**: Automatic retries for failed requests
+- **Cost Optimization**: Switch providers based on your budget and needs
+
+### Usage
+
+1. Select your preferred AI provider in the content generation interface
+2. Test the connection to ensure the provider is working
+3. Generate content ideas using your selected provider
+4. Switch providers anytime based on your needs
+
+## 🚀 Deployment Scripts
+
+The repository includes automated deployment scripts:
+
+- `scripts/deploy-to-server.sh` - Complete server deployment automation
+- `scripts/deploy-simple.sh` - Simplified deployment process
+
+### Quick Deployment
+
+```bash
+# Make script executable
+chmod +x scripts/deploy-to-server.sh
+
+# Deploy to your server
+./scripts/deploy-to-server.sh
+```
+
