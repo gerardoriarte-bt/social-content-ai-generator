@@ -86,7 +86,7 @@ export class CompanyController {
           name,
           description,
           industry,
-          userId: 'mock-user-123', // Use mock user ID
+          userId: 'demo-user-123', // Use mock user ID
         });
 
         return res.status(201).json({

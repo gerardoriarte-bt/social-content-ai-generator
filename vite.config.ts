@@ -6,11 +6,21 @@ export default defineConfig(({ mode }) => {
     return {
       server: {
         port: 3000,
-        host: true
+        host: true,
+        proxy: {
+          '^/api/.*': {
+            target: process.env.NODE_ENV === 'development' && process.env.DOCKER === 'true' 
+              ? 'http://backend-dev:3001' 
+              : 'http://localhost:3001',
+            changeOrigin: true,
+            secure: false
+          }
+        }
       },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL)
       },
       resolve: {
         alias: {

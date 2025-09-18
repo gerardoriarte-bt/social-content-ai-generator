@@ -78,7 +78,8 @@ export class IdeaController {
   static async getContentIdeas(req: Request, res: Response) {
     try {
       const { companyId, businessLineId } = req.params;
-      const userId = (req as any).user.userId;
+      // Skip authentication for now - use mock user ID
+      const userId = 'demo-user-123';
 
       // Verify company belongs to user
       const company = await CompanyModel.findById(companyId);
@@ -109,7 +110,8 @@ export class IdeaController {
   static async getContentIdea(req: Request, res: Response) {
     try {
       const { companyId, businessLineId, ideaId } = req.params;
-      const userId = (req as any).user.userId;
+      // Skip authentication for now - use mock user ID
+      const userId = 'demo-user-123';
 
       // Verify company belongs to user
       const company = await CompanyModel.findById(companyId);
@@ -146,7 +148,8 @@ export class IdeaController {
     try {
       const { companyId, businessLineId } = req.params;
       const ideaData = createContentIdeaSchema.parse(req.body);
-      const userId = (req as any).user.userId;
+      // Skip authentication for now - use mock user ID
+      const userId = 'demo-user-123';
 
       // Verify company belongs to user
       const company = await CompanyModel.findById(companyId);
@@ -187,7 +190,8 @@ export class IdeaController {
     try {
       const { companyId, businessLineId, ideaId } = req.params;
       const updateData = updateContentIdeaSchema.parse(req.body);
-      const userId = (req as any).user.userId;
+      // Skip authentication for now - use mock user ID
+      const userId = 'demo-user-123';
 
       // Verify company belongs to user
       const company = await CompanyModel.findById(companyId);
@@ -227,7 +231,8 @@ export class IdeaController {
   static async deleteContentIdea(req: Request, res: Response) {
     try {
       const { companyId, businessLineId, ideaId } = req.params;
-      const userId = (req as any).user.userId;
+      // Skip authentication for now - use mock user ID
+      const userId = 'demo-user-123';
 
       // Verify company belongs to user
       const company = await CompanyModel.findById(companyId);

@@ -82,6 +82,27 @@ app.get('/api/test-companies', (req, res) => {
   });
 });
 
+// Gemini AI status endpoint
+app.get('/api/gemini-status', async (req, res) => {
+  try {
+    const { GeminiService } = await import('./services/geminiService');
+    const isConnected = await GeminiService.testConnection();
+    
+    res.json({
+      status: isConnected ? 'connected' : 'error',
+      timestamp: new Date().toISOString(),
+      message: isConnected ? 'Gemini AI está disponible' : 'Gemini AI no está disponible'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      message: 'Error al verificar estado de Gemini AI',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Authentication routes
 app.use('/api/auth', authRoutes);
 
@@ -92,7 +113,7 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/ideas', ideaRoutes);
 
 // Content idea routes
-app.use('/api/companies', contentIdeaRoutes);
+app.use('/api/content-ideas', contentIdeaRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

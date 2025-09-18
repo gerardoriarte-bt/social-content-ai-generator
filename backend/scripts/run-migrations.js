@@ -11,7 +11,10 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || 'donbosco3462',
   database: process.env.DB_NAME || 'social_content_ai',
-  multipleStatements: true
+  multipleStatements: true,
+  acquireTimeout: 60000,
+  timeout: 60000,
+  reconnect: true
 };
 
 async function runMigrations() {

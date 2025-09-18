@@ -1,5 +1,33 @@
-
 import React, { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Box,
+  Alert,
+  CircularProgress,
+  Chip,
+  Grid,
+  Paper,
+  Divider,
+  IconButton,
+  Tooltip,
+  LinearProgress,
+} from '@mui/material';
+import {
+  AutoAwesome as AutoAwesomeIcon,
+  Settings as SettingsIcon,
+  Refresh as RefreshIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  Error as ErrorIcon,
+  Schedule as ScheduleIcon,
+} from '@mui/icons-material';
 import { IdeaService } from '../services/ideaService';
 import { CompanyService } from '../services/companyService';
 import { AIParamsForm } from './AIParamsForm';
@@ -11,11 +39,16 @@ interface IdeaGeneratorProps {
   onIdeasGenerated?: (ideas: ContentIdea[]) => void;
 }
 
-export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessLine, onIdeasGenerated }) => {
+export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ 
+  company, 
+  businessLine, 
+  onIdeasGenerated 
+}) => {
   const [numberOfIdeas, setNumberOfIdeas] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGeminiConnected, setIsGeminiConnected] = useState<boolean | null>(null);
+  const [geminiStatus, setGeminiStatus] = useState<'checking' | 'connected' | 'high-demand' | 'error'>('checking');
   const [aiParams, setAiParams] = useState<AIParams | null>(null);
   const [showAIParamsForm, setShowAIParamsForm] = useState(false);
   const [generatedIdeas, setGeneratedIdeas] = useState<ContentIdea[]>([]);
@@ -24,15 +57,24 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
   React.useEffect(() => {
     const initialize = async () => {
       try {
+        setGeminiStatus('checking');
+        
         // Test Gemini connection
         const connected = await IdeaService.testGeminiConnection();
         setIsGeminiConnected(connected);
+        
+        if (connected) {
+          setGeminiStatus('connected');
+        } else {
+          setGeminiStatus('error');
+        }
 
         // Load AI params
         const params = await CompanyService.getAIParams(company.id, businessLine.id);
         setAiParams(params);
       } catch (error) {
         console.error('Error initializing:', error);
+        setGeminiStatus('error');
         // Set as connected by default to allow users to try
         setIsGeminiConnected(true);
       }
@@ -48,24 +90,30 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
 
     setIsGenerating(true);
     setError(null);
+    setGeminiStatus('checking');
 
     try {
       const ideas = await IdeaService.generateIdeas(company.id, businessLine.id, numberOfIdeas);
       setGeneratedIdeas(ideas);
       onIdeasGenerated?.(ideas);
+      setGeminiStatus('connected');
     } catch (error) {
       console.error('Error generating ideas:', error);
       
       // Handle specific Gemini errors
       if (error instanceof Error) {
-        if (error.message.includes('503') || error.message.includes('overloaded')) {
-          setError('Gemini AI está experimentando alta demanda. Por favor, intenta de nuevo en unos minutos.');
+        if (error.message.includes('503') || error.message.includes('overloaded') || error.message.includes('high demand')) {
+          setGeminiStatus('high-demand');
+          setError('Gemini AI está experimentando alta demanda. Se han generado ideas de respaldo de alta calidad.');
         } else if (error.message.includes('429')) {
-          setError('Se ha excedido el límite de solicitudes. Por favor, espera un momento antes de intentar de nuevo.');
+          setGeminiStatus('high-demand');
+          setError('Se ha excedido el límite de solicitudes. Se han generado ideas de respaldo de alta calidad.');
         } else {
+          setGeminiStatus('error');
           setError(`Error al generar ideas: ${error.message}`);
         }
       } else {
+        setGeminiStatus('error');
         setError('Error inesperado al generar ideas. Por favor, intenta de nuevo.');
       }
     } finally {
@@ -76,191 +124,262 @@ export const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({ company, businessL
   const handleAIParamsSave = (savedParams: AIParams) => {
     setAiParams(savedParams);
     setError(null);
+    setShowAIParamsForm(false);
+  };
+
+  const getStatusIcon = () => {
+    switch (geminiStatus) {
+      case 'checking':
+        return <ScheduleIcon sx={{ color: 'warning.main' }} />;
+      case 'connected':
+        return <CheckCircleIcon sx={{ color: 'success.main' }} />;
+      case 'high-demand':
+        return <WarningIcon sx={{ color: 'warning.main' }} />;
+      case 'error':
+        return <ErrorIcon sx={{ color: 'error.main' }} />;
+      default:
+        return <ScheduleIcon sx={{ color: 'warning.main' }} />;
+    }
+  };
+
+  const getStatusText = () => {
+    switch (geminiStatus) {
+      case 'checking':
+        return 'Verificando conexión con Gemini AI...';
+      case 'connected':
+        return 'Gemini AI Conectado ✅';
+      case 'high-demand':
+        return 'Gemini AI con alta demanda ⚠️';
+      case 'error':
+        return 'Error de conexión con Gemini AI ❌';
+      default:
+        return 'Verificando conexión...';
+    }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">
-          Generar Ideas con IA
-        </h2>
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${isGeminiConnected === null ? 'bg-yellow-400' : isGeminiConnected ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
-          <span className="text-sm text-gray-600">
-            {isGeminiConnected === null ? 'Conectando...' : isGeminiConnected ? 'Gemini AI Conectado' : 'Gemini AI con alta demanda - Intenta más tarde'}
-          </span>
-        </div>
-      </div>
+    <Box>
+      {/* Header */}
+      <Box sx={{ mb: 4, textAlign: 'center' }}>
+        <Typography variant="h4" component="h2" sx={{ mb: 2, fontWeight: 600 }}>
+          Generate Content Ideas
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Create amazing content ideas for {businessLine.name} at {company.name}
+        </Typography>
+        
+        {/* Gemini Status */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 2 }}>
+          {getStatusIcon()}
+          <Typography variant="body2" color="text.secondary">
+            {getStatusText()}
+          </Typography>
+        </Box>
+      </Box>
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Número de Ideas
-          </label>
-          <select
-            value={numberOfIdeas}
-            onChange={(e) => setNumberOfIdeas(Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={isGenerating}
-          >
-            <option value={1}>1 idea</option>
-            <option value={3}>3 ideas</option>
-            <option value={5}>5 ideas</option>
-            <option value={7}>7 ideas</option>
-            <option value={10}>10 ideas</option>
-          </select>
-        </div>
-
-        {!aiParams && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-yellow-800 text-sm">
-                No se encontraron parámetros de IA para esta línea de negocio
-              </p>
-              <button
-                onClick={() => setShowAIParamsForm(true)}
-                className="px-3 py-1 bg-yellow-600 text-white text-sm rounded-md hover:bg-yellow-700"
-              >
-                Configurar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {aiParams && (
-          <div className="bg-green-50 border border-green-200 rounded-md p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-800 text-sm font-medium">Parámetros de IA configurados</p>
-                <p className="text-green-700 text-xs mt-1">
-                  Tono: {aiParams.tone} | Personaje: {aiParams.characterType}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowAIParamsForm(true)}
-                className="px-3 py-1 bg-green-600 text-white text-sm rounded-md hover:bg-green-700"
-              >
-                Editar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-red-800 text-sm">{error}</p>
-          </div>
-        )}
-
-        {isGeminiConnected === false && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">
-                  Gemini AI con alta demanda
-                </h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <p>El servicio está experimentando alta demanda. Puedes intentar generar ideas, pero es posible que falle temporalmente.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <button
-          onClick={handleGenerateIdeas}
-          disabled={isGenerating || !aiParams}
-          className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
-            isGenerating || !aiParams
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : isGeminiConnected === false
-              ? 'bg-yellow-600 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2'
-              : 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-          }`}
-        >
-          {isGenerating ? (
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Generando ideas...
-            </div>
-          ) : isGeminiConnected === false ? (
-            'Intentar Generar Ideas (Alta Demanda)'
-          ) : (
-            'Generar Ideas con IA'
-          )}
-        </button>
-      </div>
-
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h3 className="text-lg font-semibold text-blue-900 mb-3">Información de la Generación</h3>
-        <div className="space-y-2 text-sm">
-          <div><strong>Empresa:</strong> {company.name}</div>
-          <div><strong>Línea de Negocio:</strong> {businessLine.name}</div>
-          <div><strong>Industria:</strong> {company.industry}</div>
-          <div><strong>Descripción:</strong> {company.description}</div>
-        </div>
-      </div>
-
-      {/* Generated Ideas Section */}
-      {generatedIdeas.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
-            Ideas Generadas ({generatedIdeas.length})
-          </h3>
-          <div className="space-y-4">
-            {generatedIdeas.map((idea, index) => (
-              <div key={idea.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <div className="flex items-start justify-between mb-3">
-                  <h4 className="text-lg font-medium text-gray-900">
-                    {index + 1}. {idea.title}
-                  </h4>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                    {idea.platform}
-                  </span>
-                </div>
+      {/* Main Generator Card */}
+      <Card sx={{ mb: 4 }}>
+        <CardContent sx={{ p: 4 }}>
+          <Grid container spacing={4}>
+            {/* Left Column - Controls */}
+            <Grid item xs={12} md={6}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                  Generation Settings
+                </Typography>
                 
-                <div className="space-y-3">
-                  <div>
-                    <h5 className="text-sm font-medium text-gray-700 mb-1">Descripción:</h5>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{idea.description}</p>
-                  </div>
-                  
-                  <div>
-                    <h5 className="text-sm font-medium text-gray-700 mb-1">Justificación:</h5>
-                    <p className="text-sm text-gray-600">{idea.rationale}</p>
-                  </div>
-                  
-                  {idea.hashtags && idea.hashtags.length > 0 && (
-                    <div>
-                      <h5 className="text-sm font-medium text-gray-700 mb-1">Hashtags:</h5>
-                      <div className="flex flex-wrap gap-1">
-                        {idea.hashtags.map((hashtag, tagIndex) => (
-                          <span key={tagIndex} className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                            {hashtag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                  <InputLabel>Number of Ideas</InputLabel>
+                  <Select
+                    value={numberOfIdeas}
+                    label="Number of Ideas"
+                    onChange={(e) => setNumberOfIdeas(Number(e.target.value))}
+                    disabled={isGenerating}
+                  >
+                    <MenuItem value={1}>1 idea</MenuItem>
+                    <MenuItem value={3}>3 ideas</MenuItem>
+                    <MenuItem value={5}>5 ideas</MenuItem>
+                    <MenuItem value={7}>7 ideas</MenuItem>
+                    <MenuItem value={10}>10 ideas</MenuItem>
+                  </Select>
+                </FormControl>
+
+                {/* AI Parameters Status */}
+                {!aiParams ? (
+                  <Alert severity="warning" sx={{ mb: 3 }}>
+                    <Typography variant="body2">
+                      No AI parameters found for this business line
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<SettingsIcon />}
+                      onClick={() => setShowAIParamsForm(true)}
+                      sx={{ mt: 1 }}
+                    >
+                      Configure AI Parameters
+                    </Button>
+                  </Alert>
+                ) : (
+                  <Alert severity="success" sx={{ mb: 3 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      AI Parameters Configured
+                    </Typography>
+                    <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip label={aiParams.tone} size="small" />
+                      <Chip label={aiParams.characterType} size="small" />
+                      <Chip label={aiParams.socialNetwork} size="small" />
+                    </Box>
+                    <Button
+                      variant="text"
+                      size="small"
+                      startIcon={<SettingsIcon />}
+                      onClick={() => setShowAIParamsForm(true)}
+                      sx={{ mt: 1 }}
+                    >
+                      Edit Parameters
+                    </Button>
+                  </Alert>
+                )}
+
+                {/* High Demand Warning */}
+                {geminiStatus === 'high-demand' && (
+                  <Alert severity="warning" sx={{ mb: 3 }}>
+                    <Typography variant="body2">
+                      Gemini AI está experimentando alta demanda. Puedes intentar generar ideas, 
+                      pero es posible que falle temporalmente.
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1, fontWeight: 500 }}>
+                      No te preocupes: Si Gemini AI no está disponible, el sistema generará 
+                      automáticamente ideas de respaldo de alta calidad basadas en tus parámetros.
+                    </Typography>
+                  </Alert>
+                )}
+
+                {/* Generate Button */}
+                <Button
+                  variant="contained"
+                  size="large"
+                  fullWidth
+                  onClick={handleGenerateIdeas}
+                  disabled={isGenerating || !aiParams}
+                  startIcon={isGenerating ? <CircularProgress size={20} /> : <AutoAwesomeIcon />}
+                  sx={{ py: 1.5 }}
+                >
+                  {isGenerating ? 'Generating Ideas...' : 'Generate Ideas'}
+                </Button>
+              </Box>
+            </Grid>
+
+            {/* Right Column - Company Info */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                  Context Information
+                </Typography>
+                
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Company
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {company.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {company.description}
+                  </Typography>
+                </Box>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Business Line
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {businessLine.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {businessLine.description}
+                  </Typography>
+                </Box>
+
+                {company.industry && (
+                  <>
+                    <Divider sx={{ my: 2 }} />
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Industry
+                      </Typography>
+                      <Chip label={company.industry} size="small" color="secondary" />
+                    </Box>
+                  </>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Error Display */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
       )}
 
-      <AIParamsForm
-        companyId={company.id}
-        businessLineId={businessLine.id}
-        isOpen={showAIParamsForm}
-        onClose={() => setShowAIParamsForm(false)}
-        onSave={handleAIParamsSave}
-      />
-    </div>
+      {/* Generated Ideas */}
+      {generatedIdeas.length > 0 && (
+        <Box>
+          <Typography variant="h5" sx={{ mb: 3, fontWeight: 600 }}>
+            Generated Ideas ({generatedIdeas.length})
+          </Typography>
+          
+          <Grid container spacing={3}>
+            {generatedIdeas.map((idea, index) => (
+              <Grid item xs={12} md={6} key={index}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                      {idea.title}
+                    </Typography>
+                    
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {idea.description}
+                    </Typography>
+                    
+                    <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic' }}>
+                      {idea.rationale}
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {idea.hashtags.map((hashtag, tagIndex) => (
+                        <Chip
+                          key={tagIndex}
+                          label={hashtag}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      )}
+
+      {/* AI Parameters Form Dialog */}
+      {showAIParamsForm && (
+        <AIParamsForm
+          company={company}
+          businessLine={businessLine}
+          onSave={handleAIParamsSave}
+          onCancel={() => setShowAIParamsForm(false)}
+        />
+      )}
+    </Box>
   );
 };

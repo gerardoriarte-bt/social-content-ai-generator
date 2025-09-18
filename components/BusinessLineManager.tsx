@@ -1,17 +1,105 @@
 import React, { useState, useCallback } from 'react';
+import {
+  Card,
+  CardContent,
+  CardActions,
+  Typography,
+  Button,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Grid,
+  Box,
+  Alert,
+  CircularProgress,
+  Fab,
+  Tooltip,
+  Breadcrumbs,
+  Link,
+  Chip,
+  Avatar,
+  Stack,
+  Divider,
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  ArrowBack as ArrowBackIcon,
+  Business as BusinessIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  NavigateNext as NavigateNextIcon,
+  TrendingUp as TrendingUpIcon,
+  Schedule as ScheduleIcon,
+} from '@mui/icons-material';
 import { CompanyService } from '../services/companyService';
 import type { Company, BusinessLine } from '../types';
-import { Modal } from './Modal';
-import { PlusIcon, PencilIcon, TrashIcon, SparklesIcon } from './icons';
 
 interface BusinessLineManagerProps {
   company: Company;
   onBusinessLineSelect: (businessLine: BusinessLine) => void;
   onBusinessLinesUpdate: (updatedCompany: Company) => void;
+  onBack?: () => void;
 }
 
-export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ company, onBusinessLineSelect, onBusinessLinesUpdate }) => {
-  console.log('BusinessLineManager: Rendering for company:', company.name);
+const AddBusinessLineCard: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <Card
+    sx={{
+      height: '100%',
+      minHeight: 180,
+      border: '2px dashed',
+      borderColor: 'grey.300',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%)',
+      '&:hover': {
+        borderColor: 'secondary.main',
+        backgroundColor: 'secondary.50',
+        transform: 'translateY(-2px)',
+        boxShadow: '0 8px 25px rgba(6, 182, 212, 0.15)',
+      },
+    }}
+    onClick={onClick}
+  >
+    <CardContent sx={{ textAlign: 'center', py: 3 }}>
+      <Box
+        sx={{
+          width: 60,
+          height: 60,
+          borderRadius: '50%',
+          bgcolor: 'secondary.100',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mx: 'auto',
+          mb: 2,
+        }}
+      >
+        <AddIcon sx={{ fontSize: 28, color: 'secondary.main' }} />
+      </Box>
+      <Typography variant="h6" color="secondary.main" sx={{ fontWeight: 600, mb: 1 }}>
+        Add Business Line
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Create content strategy
+      </Typography>
+    </CardContent>
+  </Card>
+);
+
+export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ 
+  company, 
+  onBusinessLineSelect, 
+  onBusinessLinesUpdate,
+  onBack 
+}) => {
   const [currentCompany, setCurrentCompany] = useState<Company>(company);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLine, setEditingLine] = useState<BusinessLine | null>(null);
@@ -26,27 +114,33 @@ export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ compan
     setLineName(line ? line.name : '');
     setLineDescription(line ? line.description : '');
     setIsModalOpen(true);
+    setError(null);
+    setSuccess(null);
   }, []);
   
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setEditingLine(null);
-    setLineName('');
-    setLineDescription('');
     setError(null);
     setSuccess(null);
   }, []);
 
-  const handleSaveLine = useCallback(async () => {
-    if (!lineName.trim() || !lineDescription.trim()) return;
+  const handleSaveBusinessLine = useCallback(async () => {
+    if (!lineName.trim()) {
+      setError('Business line name is required');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
     setSuccess(null);
-    
+
     try {
+      let updatedCompany: Company;
+
       if (editingLine) {
-        const updatedBusinessLine = await CompanyService.updateBusinessLine(
+        // Update existing business line
+        updatedCompany = await CompanyService.updateBusinessLine(
           currentCompany.id,
           editingLine.id,
           {
@@ -54,210 +148,348 @@ export const BusinessLineManager: React.FC<BusinessLineManagerProps> = ({ compan
             description: lineDescription.trim(),
           }
         );
-        const updatedLines = currentCompany.businessLines.map(l => 
-          l.id === editingLine.id ? updatedBusinessLine : l
-        );
-        const updatedCompany = { ...currentCompany, businessLines: updatedLines };
-        setCurrentCompany(updatedCompany);
-        onBusinessLinesUpdate(updatedCompany);
         setSuccess('Business line updated successfully!');
       } else {
-        const newBusinessLine = await CompanyService.createBusinessLine(
-          currentCompany.id,
-          {
-            name: lineName.trim(),
-            description: lineDescription.trim(),
-          }
-        );
-        const updatedCompany = { 
-          ...currentCompany, 
-          businessLines: [...currentCompany.businessLines, newBusinessLine] 
-        };
-        setCurrentCompany(updatedCompany);
-        onBusinessLinesUpdate(updatedCompany);
+        // Create new business line
+        updatedCompany = await CompanyService.createBusinessLine(currentCompany.id, {
+          name: lineName.trim(),
+          description: lineDescription.trim(),
+        });
         setSuccess('Business line created successfully!');
       }
+
+      setCurrentCompany(updatedCompany);
+      onBusinessLinesUpdate(updatedCompany);
       
       // Close modal after a short delay to show success message
       setTimeout(() => {
         handleCloseModal();
       }, 1500);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving business line:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Error saving business line. Please try again.';
-      setError(errorMessage);
+      setError(error instanceof Error ? error.message : 'Failed to save business line');
     } finally {
       setIsLoading(false);
     }
   }, [lineName, lineDescription, editingLine, currentCompany, onBusinessLinesUpdate, handleCloseModal]);
-  
-  const handleDeleteLine = useCallback(async (lineId: string) => {
-    if (window.confirm('Are you sure you want to delete this business line?')) {
-      try {
-        await CompanyService.deleteBusinessLine(currentCompany.id, lineId);
-        const updatedLines = currentCompany.businessLines.filter(l => l.id !== lineId);
-        const updatedCompany = { ...currentCompany, businessLines: updatedLines };
-        setCurrentCompany(updatedCompany);
-        onBusinessLinesUpdate(updatedCompany);
-      } catch (error) {
-        console.error('Error deleting business line:', error);
-        alert('Error deleting business line. Please try again.');
-      }
+
+  const handleDeleteBusinessLine = useCallback(async (lineId: string) => {
+    if (!confirm('Are you sure you want to delete this business line? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const updatedCompany = await CompanyService.deleteBusinessLine(currentCompany.id, lineId);
+      setCurrentCompany(updatedCompany);
+      onBusinessLinesUpdate(updatedCompany);
+      setSuccess('Business line deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting business line:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete business line');
+    } finally {
+      setIsLoading(false);
     }
   }, [currentCompany, onBusinessLinesUpdate]);
 
+  // Mock data for demonstration - in real app, this would come from API
+  const getBusinessLineStats = (line: BusinessLine) => ({
+    contentIdeas: Math.floor(Math.random() * 15) + 3,
+    lastActivity: new Date(Date.now() - Math.random() * 3 * 24 * 60 * 60 * 1000),
+  });
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">{currentCompany.name}</h1>
-          <p className="text-lg text-slate-600">Business Lines</p>
-        </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="inline-flex items-center px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
+    <Box>
+      {/* Breadcrumbs */}
+      <Breadcrumbs 
+        separator={<NavigateNextIcon fontSize="small" />} 
+        sx={{ mb: 3 }}
+      >
+        <Link
+          component="button"
+          variant="body1"
+          onClick={onBack}
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            textDecoration: 'none',
+            '&:hover': { textDecoration: 'underline' }
+          }}
         >
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Create Business Line
-        </button>
-      </div>
-      
-      {currentCompany.businessLines.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {currentCompany.businessLines.map((line) => (
-            <div 
-              key={line.id} 
-              onClick={() => onBusinessLineSelect(line)}
-              className="bg-white p-6 rounded-2xl shadow-md flex flex-col justify-between hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer"
-            >
-              <div>
-                <div className="flex justify-between items-start">
-                  <h2 className="text-xl font-semibold text-slate-900 flex-1 pr-2">{line.name}</h2>
-                  <div className="flex items-center space-x-1 flex-shrink-0">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenModal(line);
-                      }} 
-                      className="p-2 text-slate-500 hover:text-premium-yellow-500 rounded-full"
-                    >
-                      <PencilIcon />
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteLine(line.id);
-                      }} 
-                      className="p-2 text-slate-500 hover:text-premium-red-600 rounded-full"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-2 text-sm text-slate-600 p-4 bg-slate-100 rounded-lg line-clamp-3">{line.description}</p>
-              </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-sm text-slate-500">Click to view ideas</span>
-                <SparklesIcon className="w-5 h-5 text-slate-400" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <div className="max-w-md mx-auto">
-            <div className="bg-white rounded-2xl shadow-md p-8">
-              <h3 className="text-lg font-medium text-slate-800 mb-4">No business lines yet</h3>
-              <p className="text-sm text-slate-600 mb-6">Create your first business line to start generating content ideas.</p>
-              <button
-                onClick={() => handleOpenModal()}
-                className="w-full inline-flex justify-center items-center px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
-              >
-                <PlusIcon className="w-5 h-5 mr-2" />
-                Create Your First Business Line
-              </button>
-            </div>
-          </div>
-        </div>
+          <ArrowBackIcon sx={{ mr: 1, fontSize: 20 }} />
+          Companies
+        </Link>
+        <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
+          <BusinessIcon sx={{ mr: 1, fontSize: 20 }} />
+          {currentCompany.name}
+        </Typography>
+      </Breadcrumbs>
+
+      {/* Compact Header */}
+      <Box sx={{ mb: 3, textAlign: 'center' }}>
+        <Typography variant="h4" component="h2" sx={{ mb: 1, fontWeight: 700 }}>
+          Business Lines
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {currentCompany.businessLines?.length || 0} {currentCompany.businessLines?.length === 1 ? 'line' : 'lines'} • {currentCompany.name}
+        </Typography>
+        {currentCompany.description && (
+          <Chip
+            label={currentCompany.description}
+            variant="outlined"
+            color="secondary"
+            size="small"
+            sx={{ fontSize: '0.75rem' }}
+          />
+        )}
+      </Box>
+
+      {/* Success/Error Messages */}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {success}
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
-        <div className="p-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">
-            {editingLine ? 'Edit Business Line' : 'Create New Business Line'}
-          </h2>
-          
-          {/* Success Message */}
-          {success && (
-            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                {success}
-              </div>
-            </div>
-          )}
-          
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                {error}
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Business Line Name</label>
-              <input
-                type="text"
-                value={lineName}
-                onChange={(e) => setLineName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-premium-red-500"
-                placeholder="Enter business line name"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <textarea
-                value={lineDescription}
-                onChange={(e) => setLineDescription(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-premium-red-500"
-                placeholder="Enter business line description"
-                rows={3}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              onClick={handleCloseModal}
-              className="px-4 py-2 text-slate-600 hover:text-slate-800"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveLine}
-              disabled={isLoading || !lineName.trim() || !lineDescription.trim()}
-              className="px-4 py-2 bg-premium-red-600 text-white rounded-md hover:bg-premium-red-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
-            >
-              {isLoading && (
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {isLoading ? 'Saving...' : editingLine ? 'Update' : 'Create'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+      {/* Compact Business Lines Grid */}
+      <Grid container spacing={2}>
+        {/* Add Business Line Card */}
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <AddBusinessLineCard onClick={() => handleOpenModal()} />
+        </Grid>
+
+        {/* Existing Business Lines - Compact Cards */}
+        {currentCompany.businessLines?.map((line) => {
+          const stats = getBusinessLineStats(line);
+          return (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={line.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(0,0,0,0.12)',
+                  },
+                }}
+                onClick={() => onBusinessLineSelect(line)}
+              >
+                <CardContent sx={{ flexGrow: 1, p: 2 }}>
+                  {/* Business Line Header */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: 'secondary.main',
+                        width: 32,
+                        height: 32,
+                        mr: 1.5,
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      {line.name.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                          fontWeight: 600, 
+                          fontSize: '0.95rem',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {line.name}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Description */}
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary" 
+                    sx={{ 
+                      mb: 1.5,
+                      fontSize: '0.8rem',
+                      lineHeight: 1.4,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {line.description || 'No description provided'}
+                  </Typography>
+
+                  <Divider sx={{ my: 1 }} />
+
+                  {/* Stats */}
+                  <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <AutoAwesomeIcon sx={{ fontSize: 14, mr: 0.5, color: 'secondary.main' }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {stats.contentIdeas} ideas
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <TrendingUpIcon sx={{ fontSize: 14, mr: 0.5, color: 'success.main' }} />
+                      <Typography variant="caption" color="text.secondary">
+                        Active
+                      </Typography>
+                    </Box>
+                  </Stack>
+
+                  {/* Last Activity */}
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <ScheduleIcon sx={{ fontSize: 12, mr: 0.5, color: 'text.disabled' }} />
+                    <Typography variant="caption" color="text.disabled">
+                      {stats.lastActivity.toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                </CardContent>
+
+                <CardActions sx={{ p: 1.5, pt: 0 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <Box>
+                      <Tooltip title="Edit Business Line">
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenModal(line);
+                          }}
+                          color="primary"
+                          size="small"
+                          sx={{ p: 0.5 }}
+                        >
+                          <EditIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Business Line">
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteBusinessLine(line.id);
+                          }}
+                          color="error"
+                          size="small"
+                          sx={{ p: 0.5 }}
+                        >
+                          <DeleteIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                    
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      size="small"
+                      endIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onBusinessLineSelect(line);
+                      }}
+                      sx={{ 
+                        minWidth: 'auto',
+                        px: 1.5,
+                        py: 0.5,
+                        fontSize: '0.75rem',
+                        height: 28,
+                      }}
+                    >
+                      Generate
+                    </Button>
+                  </Box>
+                </CardActions>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
+
+      {/* Floating Action Button for Mobile */}
+      <Fab
+        color="primary"
+        aria-label="add business line"
+        sx={{
+          position: 'fixed',
+          bottom: 16,
+          right: 16,
+          display: { xs: 'flex', sm: 'none' },
+        }}
+        onClick={() => handleOpenModal()}
+      >
+        <AddIcon />
+      </Fab>
+
+      {/* Add/Edit Business Line Dialog */}
+      <Dialog
+        open={isModalOpen}
+        onClose={handleCloseModal}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            {editingLine ? 'Edit Business Line' : 'Add New Business Line'}
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <TextField
+              autoFocus
+              margin="normal"
+              label="Business Line Name"
+              fullWidth
+              variant="outlined"
+              value={lineName}
+              onChange={(e) => setLineName(e.target.value)}
+              required
+              sx={{ mb: 2 }}
+              placeholder="e.g., Product Marketing, Customer Support"
+            />
+            
+            <TextField
+              margin="normal"
+              label="Description"
+              fullWidth
+              multiline
+              rows={3}
+              variant="outlined"
+              value={lineDescription}
+              onChange={(e) => setLineDescription(e.target.value)}
+              placeholder="Describe what this business line focuses on..."
+            />
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={handleCloseModal} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveBusinessLine}
+            variant="contained"
+            disabled={isLoading || !lineName.trim()}
+            startIcon={isLoading ? <CircularProgress size={20} /> : null}
+          >
+            {isLoading ? 'Saving...' : editingLine ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
-
-console.log('BusinessLineManager: Component definition complete');

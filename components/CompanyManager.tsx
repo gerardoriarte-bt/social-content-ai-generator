@@ -1,9 +1,40 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Card,
+  CardContent,
+  CardActions,
+  Typography,
+  Button,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Grid,
+  Box,
+  Chip,
+  Alert,
+  CircularProgress,
+  Fab,
+  Tooltip,
+  Avatar,
+  Stack,
+  Divider,
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Business as BusinessIcon,
+  ArrowForward as ArrowForwardIcon,
+  TrendingUp as TrendingUpIcon,
+  People as PeopleIcon,
+  Schedule as ScheduleIcon,
+} from '@mui/icons-material';
 import { CompanyService } from '../services/companyService';
 import type { Company, BusinessLine } from '../types';
-import { Modal } from './Modal';
 import { BusinessLineManager } from './BusinessLineManager';
-import { PlusIcon, PencilIcon, TrashIcon, ChevronRightIcon } from './icons';
 
 interface CompanyManagerProps {
   companies: Company[];
@@ -13,17 +44,60 @@ interface CompanyManagerProps {
 }
 
 const AddCompanyCard: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-  <button
+  <Card
+    sx={{
+      height: '100%',
+      minHeight: 180,
+      border: '2px dashed',
+      borderColor: 'grey.300',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.05) 0%, rgba(6, 182, 212, 0.05) 100%)',
+      '&:hover': {
+        borderColor: 'primary.main',
+        backgroundColor: 'primary.50',
+        transform: 'translateY(-2px)',
+        boxShadow: '0 8px 25px rgba(124, 58, 237, 0.15)',
+      },
+    }}
     onClick={onClick}
-    className="relative block w-full h-full border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-premium-red-500 hover:text-premium-red-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-500 transition-colors duration-200"
   >
-    <PlusIcon className="mx-auto h-8 w-8" />
-    <span className="mt-2 block text-sm font-semibold">Add New Company</span>
-  </button>
+    <CardContent sx={{ textAlign: 'center', py: 3 }}>
+      <Box
+        sx={{
+          width: 60,
+          height: 60,
+          borderRadius: '50%',
+          bgcolor: 'primary.100',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          mx: 'auto',
+          mb: 2,
+        }}
+      >
+        <AddIcon sx={{ fontSize: 28, color: 'primary.main' }} />
+      </Box>
+      <Typography variant="h6" color="primary.main" sx={{ fontWeight: 600, mb: 1 }}>
+        Add Company
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Start your content journey
+      </Typography>
+    </CardContent>
+  </Card>
 );
 
-export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selectedCompany, onCompanySelect, onCompaniesUpdate }) => {
-  console.log('CompanyManager: Rendering with selectedCompany:', selectedCompany);
+export const CompanyManager: React.FC<CompanyManagerProps> = ({ 
+  companies, 
+  selectedCompany, 
+  onCompanySelect, 
+  onCompaniesUpdate 
+}) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [companyName, setCompanyName] = useState('');
@@ -48,266 +122,380 @@ export const CompanyManager: React.FC<CompanyManagerProps> = ({ companies, selec
   const handleOpenModal = useCallback((company: Company | null = null) => {
     setEditingCompany(company);
     setIsModalOpen(true);
+    setError(null);
+    setSuccess(null);
   }, []);
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
     setEditingCompany(null);
-    setCompanyName('');
-    setCompanyDescription('');
-    setCompanyIndustry('');
     setError(null);
     setSuccess(null);
   }, []);
 
-  const handleBusinessLinesUpdate = useCallback((updatedCompany: Company) => {
-    const updatedCompanies = companies.map(c => 
-      c.id === updatedCompany.id ? updatedCompany : c
-    );
-    onCompaniesUpdate(updatedCompanies);
-  }, [companies, onCompaniesUpdate]);
-
-  const handleBusinessLineSelect = useCallback((businessLine: BusinessLine) => {
-    // Handle business line selection if needed
-    console.log('Selected business line:', businessLine);
-  }, []);
-
-
   const handleSaveCompany = useCallback(async () => {
-    if (!companyName.trim() || !companyDescription.trim() || !companyIndustry.trim()) return;
+    if (!companyName.trim()) {
+      setError('Company name is required');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
     setSuccess(null);
-    
+
     try {
+      let updatedCompanies: Company[];
+
       if (editingCompany) {
+        // Update existing company
         const updatedCompany = await CompanyService.updateCompany(editingCompany.id, {
           name: companyName.trim(),
           description: companyDescription.trim(),
           industry: companyIndustry.trim(),
         });
-        const updatedCompanies = companies.map(c => 
+        updatedCompanies = companies.map(c => 
           c.id === editingCompany.id ? updatedCompany : c
         );
-        onCompaniesUpdate(updatedCompanies);
         setSuccess('Company updated successfully!');
       } else {
+        // Create new company
         const newCompany = await CompanyService.createCompany({
           name: companyName.trim(),
           description: companyDescription.trim(),
           industry: companyIndustry.trim(),
         });
-        onCompaniesUpdate([...companies, newCompany]);
+        updatedCompanies = [...companies, newCompany];
         setSuccess('Company created successfully!');
       }
+
+      onCompaniesUpdate(updatedCompanies);
       
       // Close modal after a short delay to show success message
       setTimeout(() => {
         handleCloseModal();
       }, 1500);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving company:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Error saving company. Please try again.';
-      setError(errorMessage);
+      setError(error instanceof Error ? error.message : 'Failed to save company');
     } finally {
       setIsLoading(false);
     }
   }, [companyName, companyDescription, companyIndustry, editingCompany, companies, onCompaniesUpdate, handleCloseModal]);
 
-  const handleDeleteCompany = useCallback(async (e: React.MouseEvent, companyId: string) => {
-    e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this company and all its data?')) {
-      try {
-        await CompanyService.deleteCompany(companyId);
-        const updatedCompanies = companies.filter(c => c.id !== companyId);
-        onCompaniesUpdate(updatedCompanies);
-      } catch (error) {
-        console.error('Error deleting company:', error);
-        alert('Error deleting company. Please try again.');
-      }
+  const handleDeleteCompany = useCallback(async (companyId: string) => {
+    if (!confirm('Are you sure you want to delete this company? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await CompanyService.deleteCompany(companyId);
+      const updatedCompanies = companies.filter(c => c.id !== companyId);
+      onCompaniesUpdate(updatedCompanies);
+      setSuccess('Company deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting company:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete company');
+    } finally {
+      setIsLoading(false);
     }
   }, [companies, onCompaniesUpdate]);
-  
-  const handleEditCompany = (e: React.MouseEvent, company: Company) => {
-    e.stopPropagation();
-    handleOpenModal(company);
-  };
+
+  // Mock data for demonstration - in real app, this would come from API
+  const getCompanyStats = (company: Company) => ({
+    businessLines: Math.floor(Math.random() * 5) + 1,
+    contentIdeas: Math.floor(Math.random() * 20) + 5,
+    lastActivity: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
+  });
+
+  if (selectedCompany) {
+    return (
+      <BusinessLineManager
+        company={selectedCompany}
+        onBack={() => onCompanySelect(null)}
+      />
+    );
+  }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-slate-900">Companies</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="inline-flex items-center px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
-        >
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Create Company
-        </button>
-      </div>
-      
-      {companies.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {companies.map((company) => (
-            <div 
-              key={company.id} 
-              onClick={() => {
-                console.log('CompanyManager: Card clicked for company:', company);
-                onCompanySelect(company);
-              }}
-              className="group relative bg-white rounded-2xl shadow-md p-6 flex flex-col justify-between hover:shadow-lg hover:-translate-y-1 transition-all duration-200 cursor-pointer"
-            >
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900 group-hover:text-premium-red-600 transition-colors">{company.name}</h2>
-                <p className="text-sm text-slate-600 mt-1">{company.description}</p>
-                <p className="text-xs text-slate-500 mt-2">Industry: {company.industry}</p>
-              </div>
-              <div className="absolute top-4 right-4 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => handleEditCompany(e, company)} className="p-2 text-slate-500 hover:text-premium-yellow-500 bg-white/50 backdrop-blur-sm rounded-full">
-                  <PencilIcon />
-                </button>
-                <button onClick={(e) => handleDeleteCompany(e, company.id)} className="p-2 text-slate-500 hover:text-premium-red-600 bg-white/50 backdrop-blur-sm rounded-full">
-                  <TrashIcon />
-                </button>
-              </div>
-              <div className="flex items-center justify-between mt-4">
-                <span className="text-sm text-slate-500">Click to manage business lines</span>
-                <ChevronRightIcon className="w-5 h-5 text-slate-400 group-hover:text-premium-red-500 transition-colors" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <div className="max-w-md mx-auto">
-            <div className="bg-white rounded-2xl shadow-md p-8">
-              <h3 className="text-lg font-medium text-slate-800 mb-4">No companies yet</h3>
-              <p className="text-sm text-slate-600 mb-6">Create your first company to get started with content generation.</p>
-              <button
-                onClick={() => handleOpenModal()}
-                className="w-full inline-flex justify-center items-center px-4 py-2 bg-premium-red-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-premium-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-premium-red-600"
-              >
-                <PlusIcon className="w-5 h-5 mr-2" />
-                Create Your First Company
-              </button>
-            </div>
-          </div>
-        </div>
+    <Box>
+      {/* Compact Header */}
+      <Box sx={{ mb: 3, textAlign: 'center' }}>
+        <Typography variant="h4" component="h2" sx={{ mb: 1, fontWeight: 700 }}>
+          Companies
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {companies.length} {companies.length === 1 ? 'company' : 'companies'} • Manage your content strategy
+        </Typography>
+      </Box>
+
+      {/* Success/Error Messages */}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {success}
+        </Alert>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
       )}
 
-      {/* Business Line Manager for selected company */}
-      {console.log('CompanyManager: Checking selectedCompany condition:', selectedCompany, 'Truthy?', !!selectedCompany)}
-      {selectedCompany && (
-        <div className="mt-8">
-          {console.log('CompanyManager: Rendering BusinessLineManager for:', selectedCompany.name)}
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-semibold text-slate-900">Business Lines for {selectedCompany.name}</h2>
-                <p className="text-sm text-slate-600 mt-1">Manage business lines for content generation</p>
-              </div>
-              <button
-                onClick={() => onCompanySelect(null)}
-                className="px-4 py-2 text-slate-600 hover:text-slate-800 text-sm font-medium"
+      {/* Compact Companies Grid */}
+      <Grid container spacing={2}>
+        {/* Add Company Card */}
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <AddCompanyCard onClick={() => handleOpenModal()} />
+        </Grid>
+
+        {/* Existing Companies - Compact Cards */}
+        {companies.map((company) => {
+          const stats = getCompanyStats(company);
+          return (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={company.id}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(0,0,0,0.12)',
+                  },
+                }}
+                onClick={() => onCompanySelect(company)}
               >
-                ← Back to Companies
-              </button>
-            </div>
-            <BusinessLineManager
-              company={selectedCompany}
-              onBusinessLineSelect={handleBusinessLineSelect}
-              onBusinessLinesUpdate={handleBusinessLinesUpdate}
+                <CardContent sx={{ flexGrow: 1, p: 2 }}>
+                  {/* Company Header */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: 'primary.main',
+                        width: 32,
+                        height: 32,
+                        mr: 1.5,
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      {company.name.charAt(0).toUpperCase()}
+                    </Avatar>
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        sx={{ 
+                          fontWeight: 600, 
+                          fontSize: '0.95rem',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {company.name}
+                      </Typography>
+                      {company.industry && (
+                        <Chip
+                          label={company.industry}
+                          size="small"
+                          color="secondary"
+                          variant="outlined"
+                          sx={{ 
+                            height: 20, 
+                            fontSize: '0.75rem',
+                            mt: 0.5,
+                          }}
+                        />
+                      )}
+                    </Box>
+                  </Box>
+
+                  {/* Description */}
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary" 
+                    sx={{ 
+                      mb: 1.5,
+                      fontSize: '0.8rem',
+                      lineHeight: 1.4,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {company.description || 'No description provided'}
+                  </Typography>
+
+                  <Divider sx={{ my: 1 }} />
+
+                  {/* Stats */}
+                  <Stack direction="row" spacing={2} sx={{ mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <TrendingUpIcon sx={{ fontSize: 14, mr: 0.5, color: 'success.main' }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {stats.businessLines} lines
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                      <PeopleIcon sx={{ fontSize: 14, mr: 0.5, color: 'info.main' }} />
+                      <Typography variant="caption" color="text.secondary">
+                        {stats.contentIdeas} ideas
+                      </Typography>
+                    </Box>
+                  </Stack>
+
+                  {/* Last Activity */}
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <ScheduleIcon sx={{ fontSize: 12, mr: 0.5, color: 'text.disabled' }} />
+                    <Typography variant="caption" color="text.disabled">
+                      {stats.lastActivity.toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                </CardContent>
+
+                <CardActions sx={{ p: 1.5, pt: 0 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <Box>
+                      <Tooltip title="Edit Company">
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenModal(company);
+                          }}
+                          color="primary"
+                          size="small"
+                          sx={{ p: 0.5 }}
+                        >
+                          <EditIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Company">
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCompany(company.id);
+                          }}
+                          color="error"
+                          size="small"
+                          sx={{ p: 0.5 }}
+                        >
+                          <DeleteIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                    
+                    <Button
+                      variant="contained"
+                      size="small"
+                      endIcon={<ArrowForwardIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCompanySelect(company);
+                      }}
+                      sx={{ 
+                        minWidth: 'auto',
+                        px: 1.5,
+                        py: 0.5,
+                        fontSize: '0.75rem',
+                        height: 28,
+                      }}
+                    >
+                      Open
+                    </Button>
+                  </Box>
+                </CardActions>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
+
+      {/* Floating Action Button for Mobile */}
+      <Fab
+        color="primary"
+        aria-label="add company"
+        sx={{
+          position: 'fixed',
+          bottom: 16,
+          right: 16,
+          display: { xs: 'flex', sm: 'none' },
+        }}
+        onClick={() => handleOpenModal()}
+      >
+        <AddIcon />
+      </Fab>
+
+      {/* Add/Edit Company Dialog */}
+      <Dialog
+        open={isModalOpen}
+        onClose={handleCloseModal}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            {editingCompany ? 'Edit Company' : 'Add New Company'}
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <TextField
+              autoFocus
+              margin="normal"
+              label="Company Name"
+              fullWidth
+              variant="outlined"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              required
+              sx={{ mb: 2 }}
             />
-          </div>
-        </div>
-      )}
-
-      <Modal isOpen={isModalOpen} onClose={handleCloseModal}>
-        <div className="p-6">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">
-            {editingCompany ? 'Edit Company' : 'Create New Company'}
-          </h2>
-          
-          {/* Success Message */}
-          {success && (
-            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                {success}
-              </div>
-            </div>
-          )}
-          
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-md">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                {error}
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-premium-red-500"
-                placeholder="Enter company name"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <textarea
-                value={companyDescription}
-                onChange={(e) => setCompanyDescription(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-premium-red-500"
-                placeholder="Enter company description"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Industry</label>
-              <input
-                type="text"
-                value={companyIndustry}
-                onChange={(e) => setCompanyIndustry(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-premium-red-500"
-                placeholder="Enter industry"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              onClick={handleCloseModal}
-              className="px-4 py-2 text-slate-600 hover:text-slate-800"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSaveCompany}
-              disabled={isLoading || !companyName.trim() || !companyDescription.trim() || !companyIndustry.trim()}
-              className="px-4 py-2 bg-premium-red-600 text-white rounded-md hover:bg-premium-red-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center"
-            >
-              {isLoading && (
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {isLoading ? 'Saving...' : editingCompany ? 'Update' : 'Create'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+            
+            <TextField
+              margin="normal"
+              label="Description"
+              fullWidth
+              multiline
+              rows={3}
+              variant="outlined"
+              value={companyDescription}
+              onChange={(e) => setCompanyDescription(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+            
+            <TextField
+              margin="normal"
+              label="Industry"
+              fullWidth
+              variant="outlined"
+              value={companyIndustry}
+              onChange={(e) => setCompanyIndustry(e.target.value)}
+              placeholder="e.g., Technology, Healthcare, Finance"
+            />
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={handleCloseModal} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveCompany}
+            variant="contained"
+            disabled={isLoading || !companyName.trim()}
+            startIcon={isLoading ? <CircularProgress size={20} /> : null}
+          >
+            {isLoading ? 'Saving...' : editingCompany ? 'Update' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };

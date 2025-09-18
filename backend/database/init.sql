@@ -87,11 +87,13 @@ CREATE TABLE IF NOT EXISTS content_ideas (
     title VARCHAR(500) NOT NULL,
     description TEXT NOT NULL,
     rationale TEXT NOT NULL,
+    platform VARCHAR(100) NOT NULL DEFAULT 'Instagram',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (business_line_id) REFERENCES business_lines(id) ON DELETE CASCADE,
     INDEX idx_business_line_id (business_line_id),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_platform (platform)
 );
 
 -- Hashtags table (many-to-many relationship with content ideas)

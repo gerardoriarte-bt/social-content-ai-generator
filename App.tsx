@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { ThemeProvider, CssBaseline, Container, Box, Typography } from '@mui/material';
 import { User, Company, BusinessLine } from './types';
 import { CompanyManager } from './components/CompanyManager';
 import { BusinessLineManager } from './components/BusinessLineManager';
 import { IdeaGenerator } from './components/IdeaGenerator';
 import { Header } from './components/Header';
+import { ApiDebugger } from './components/ApiDebugger';
+import { GeminiStatusBanner } from './components/GeminiStatusBanner';
+import { QuickNavigation } from './components/QuickNavigation';
 import { CompanyService } from './services/companyService';
+import { theme, darkTheme } from './src/theme';
+import './src/fonts.css';
 
 type AppStep = 'companies' | 'business-lines' | 'idea-generation';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState<AppStep>('companies');
+  const [darkMode, setDarkMode] = useState(false);
   const [currentUser] = useState<User>({
     id: 'demo-user-123',
     name: 'Demo User',
@@ -37,6 +44,10 @@ export default function App() {
     setSelectedCompany(null);
     setSelectedBusinessLine(null);
     setCurrentStep('companies');
+  };
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
   };
 
   const handleBackToBusinessLines = () => {
@@ -74,11 +85,31 @@ export default function App() {
     switch (currentStep) {
       case 'companies':
         return (
-          <CompanyManager
-            companies={companies}
-            onCompaniesUpdate={setCompanies}
-            onCompanySelect={handleCompanySelect}
-          />
+          <Box sx={{ display: 'flex', gap: 4 }}>
+            {/* Quick Navigation Sidebar */}
+            {companies.length > 0 && (
+              <Box sx={{ width: 300, flexShrink: 0 }}>
+                <QuickNavigation
+                  companies={companies}
+                  onCompanySelect={handleCompanySelect}
+                  onBusinessLineSelect={(company, businessLine) => {
+                    setSelectedCompany(company);
+                    setSelectedBusinessLine(businessLine);
+                    setCurrentStep('idea-generation');
+                  }}
+                />
+              </Box>
+            )}
+            
+            {/* Main Content */}
+            <Box sx={{ flexGrow: 1 }}>
+              <CompanyManager
+                companies={companies}
+                onCompaniesUpdate={setCompanies}
+                onCompanySelect={handleCompanySelect}
+              />
+            </Box>
+          </Box>
         );
       
       case 'business-lines':
@@ -139,49 +170,137 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header currentUser={currentUser} />
-      
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+    <ThemeProvider theme={darkMode ? darkTheme : theme}>
+      <CssBaseline />
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+        <Header 
+          currentUser={currentUser} 
+          darkMode={darkMode}
+          onToggleDarkMode={toggleDarkMode}
+          onLogout={() => {}} // Mock logout function
+        />
+        
+        <Container maxWidth="xl" sx={{ py: 4 }}>
+          {/* Gemini Status Banner */}
+          <Box sx={{ mb: 4 }}>
+            <GeminiStatusBanner />
+          </Box>
+          
+          {/* Hero Section */}
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Typography 
+              variant="h2" 
+              component="h1" 
+              sx={{ 
+                mb: 2,
+                background: 'linear-gradient(45deg, #7c3aed, #06b6d4)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
               🚀 Social Content AI Generator
-            </h1>
-            <p className="text-xl text-gray-600 mb-8">
+            </Typography>
+            <Typography variant="h5" color="text.secondary" sx={{ mb: 4 }}>
               Generate amazing content ideas step by step
-            </p>
+            </Typography>
             
             {/* Step Indicator */}
-            <div className="flex justify-center mb-8">
-              <div className="flex items-center space-x-4">
-                <div className={`flex items-center ${currentStep === 'companies' ? 'text-blue-600' : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'companies' ? 'bg-blue-600 text-white' : 'bg-gray-300'}`}>
-                    1
-                  </div>
-                  <span className="ml-2 font-medium">Companies</span>
-                </div>
-                <div className="w-8 h-0.5 bg-gray-300"></div>
-                <div className={`flex items-center ${currentStep === 'business-lines' ? 'text-blue-600' : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'business-lines' ? 'bg-blue-600 text-white' : 'bg-gray-300'}`}>
-                    2
-                  </div>
-                  <span className="ml-2 font-medium">Business Lines</span>
-                </div>
-                <div className="w-8 h-0.5 bg-gray-300"></div>
-                <div className={`flex items-center ${currentStep === 'idea-generation' ? 'text-blue-600' : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep === 'idea-generation' ? 'bg-blue-600 text-white' : 'bg-gray-300'}`}>
-                    3
-                  </div>
-                  <span className="ml-2 font-medium">Ideas</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mb: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: currentStep === 'companies' ? 'primary.main' : 'grey.300',
+                    color: currentStep === 'companies' ? 'white' : 'grey.600',
+                    fontWeight: 600,
+                  }}
+                >
+                  1
+                </Box>
+                <Typography 
+                  variant="body1" 
+                  sx={{ 
+                    fontWeight: 500,
+                    color: currentStep === 'companies' ? 'primary.main' : 'text.secondary'
+                  }}
+                >
+                  Companies
+                </Typography>
+              </Box>
+              
+              <Box sx={{ width: 32, height: 2, bgcolor: 'grey.300' }} />
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: currentStep === 'business-lines' ? 'primary.main' : 'grey.300',
+                    color: currentStep === 'business-lines' ? 'white' : 'grey.600',
+                    fontWeight: 600,
+                  }}
+                >
+                  2
+                </Box>
+                <Typography 
+                  variant="body1" 
+                  sx={{ 
+                    fontWeight: 500,
+                    color: currentStep === 'business-lines' ? 'primary.main' : 'text.secondary'
+                  }}
+                >
+                  Business Lines
+                </Typography>
+              </Box>
+              
+              <Box sx={{ width: 32, height: 2, bgcolor: 'grey.300' }} />
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: currentStep === 'idea-generation' ? 'primary.main' : 'grey.300',
+                    color: currentStep === 'idea-generation' ? 'white' : 'grey.600',
+                    fontWeight: 600,
+                  }}
+                >
+                  3
+                </Box>
+                <Typography 
+                  variant="body1" 
+                  sx={{ 
+                    fontWeight: 500,
+                    color: currentStep === 'idea-generation' ? 'primary.main' : 'text.secondary'
+                  }}
+                >
+                  Ideas
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
 
+          {/* Render current step */}
           {renderCurrentStep()}
-        </div>
-      </main>
-    </div>
+        </Container>
+
+        {/* API Debugger - Remove in production */}
+        <ApiDebugger />
+      </Box>
+    </ThemeProvider>
   );
 }

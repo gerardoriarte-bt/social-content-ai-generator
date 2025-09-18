@@ -9,6 +9,37 @@ export class IdeaService {
     };
   }
 
+  private static async handleResponse<T>(response: Response): Promise<T> {
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+      }
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    // Check if response has content
+    const contentLength = response.headers.get('content-length');
+    if (contentLength === '0') {
+      throw new Error('Empty response from server');
+    }
+    
+    try {
+      const text = await response.text();
+      if (!text.trim()) {
+        throw new Error('Empty response body');
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      console.error('Error parsing response:', error);
+      console.error('Response status:', response.status);
+      console.error('Response headers:', Object.fromEntries(response.headers.entries()));
+      throw new Error('Invalid JSON response from server');
+    }
+  }
+
   // Generate content ideas using AI
   static async generateIdeas(companyId: string, businessLineId: string, numberOfIdeas: number = 5): Promise<ContentIdea[]> {
     try {
@@ -18,12 +49,7 @@ export class IdeaService {
         body: JSON.stringify({ numberOfIdeas }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate ideas');
-      }
-
-      const data = await response.json();
+      const data = await this.handleResponse<{ ideas: ContentIdea[] }>(response);
       return data.ideas;
     } catch (error) {
       console.error('Error generating ideas:', error);

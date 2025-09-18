@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Frontend service (development)
   frontend-dev:
@@ -14,6 +12,7 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_API_URL=http://localhost:3001
+      - DOCKER=true
     depends_on:
       - backend-dev
     networks:
