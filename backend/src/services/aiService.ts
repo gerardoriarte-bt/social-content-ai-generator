@@ -49,15 +49,23 @@ export class AIService {
             throw new Error(`Unsupported AI provider: ${provider}`);
         }
 
-        console.log(`${provider.toUpperCase()} success: Generated ${ideas.length} ideas`);
-        return ideas;
+        // Validar que las ideas cumplan con los parámetros
+        const validatedIdeas = this.validateIdeas(ideas, request);
+        
+        if (validatedIdeas.length >= request.numberOfIdeas! / 2) {
+          console.log(`${provider.toUpperCase()} success: Generated ${validatedIdeas.length} validated ideas`);
+          return validatedIdeas;
+        } else {
+          console.log(`${provider.toUpperCase()} validation failed: Only ${validatedIdeas.length} ideas passed validation`);
+          throw new Error('Insufficient validated ideas');
+        }
 
       } catch (error: any) {
         console.error(`${provider.toUpperCase()} attempt ${attempt + 1} failed:`, error.message);
         
         if (attempt === this.MAX_RETRIES - 1) {
-          console.log(`All ${provider.toUpperCase()} attempts failed, using fallback`);
-          return this.generateFallbackIdeas(request);
+          console.log(`All ${provider.toUpperCase()} attempts failed, using enhanced fallback`);
+          return this.generateEnhancedFallbackIdeas(request);
         }
         
         // Esperar antes del siguiente intento
@@ -65,7 +73,44 @@ export class AIService {
       }
     }
 
-    return this.generateFallbackIdeas(request);
+    return this.generateEnhancedFallbackIdeas(request);
+  }
+
+  private static validateIdeas(ideas: ContentIdea[], request: IdeaGenerationRequest): ContentIdea[] {
+    const { aiParams, company, businessLine } = request;
+    
+    return ideas.filter(idea => {
+      // Validar que la plataforma sea correcta
+      if (idea.platform !== aiParams.socialNetwork) {
+        console.log(`Validation failed: Platform mismatch. Expected ${aiParams.socialNetwork}, got ${idea.platform}`);
+        return false;
+      }
+
+      // Validar que el título contenga palabras clave relevantes
+      const titleLower = idea.title.toLowerCase();
+      const businessLineLower = businessLine.name.toLowerCase();
+      const companyLower = company.name.toLowerCase();
+      
+      if (!titleLower.includes(businessLineLower.split(' ')[0]) && !titleLower.includes(companyLower.split(' ')[0])) {
+        console.log(`Validation failed: Title doesn't contain business line or company keywords`);
+        return false;
+      }
+
+      // Validar que la descripción sea específica
+      const descriptionLower = idea.description.toLowerCase();
+      if (descriptionLower.length < 50) {
+        console.log(`Validation failed: Description too short`);
+        return false;
+      }
+
+      // Validar que los hashtags sean relevantes
+      if (!idea.hashtags.some(tag => tag.toLowerCase().includes(aiParams.socialNetwork.toLowerCase()))) {
+        console.log(`Validation failed: No platform-specific hashtags`);
+        return false;
+      }
+
+      return true;
+    });
   }
 
   private static async generateWithGemini(request: IdeaGenerationRequest): Promise<ContentIdea[]> {
@@ -74,7 +119,7 @@ export class AIService {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
-    const prompt = this.buildPrompt(company, businessLine, aiParams, numberOfIdeas, 'Google Gemini');
+    const prompt = this.buildStrictPrompt(company, businessLine, aiParams, numberOfIdeas, 'Google Gemini');
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
@@ -85,7 +130,7 @@ export class AIService {
   private static async generateWithOpenAI(request: IdeaGenerationRequest): Promise<ContentIdea[]> {
     const { company, businessLine, aiParams, numberOfIdeas = 5 } = request;
     
-    const prompt = this.buildPrompt(company, businessLine, aiParams, numberOfIdeas, 'OpenAI GPT-4');
+    const prompt = this.buildStrictPrompt(company, businessLine, aiParams, numberOfIdeas, 'OpenAI GPT-4');
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -102,7 +147,7 @@ export class AIService {
           }
         ],
         max_tokens: 2000,
-        temperature: 0.3, // Reducido para mayor consistencia
+        temperature: 0.1, // Muy bajo para máxima consistencia
       }),
     });
 
@@ -119,7 +164,7 @@ export class AIService {
   private static async generateWithClaude(request: IdeaGenerationRequest): Promise<ContentIdea[]> {
     const { company, businessLine, aiParams, numberOfIdeas = 5 } = request;
     
-    const prompt = this.buildPrompt(company, businessLine, aiParams, numberOfIdeas, 'Anthropic Claude');
+    const prompt = this.buildStrictPrompt(company, businessLine, aiParams, numberOfIdeas, 'Anthropic Claude');
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -131,7 +176,7 @@ export class AIService {
       body: JSON.stringify({
         model: 'claude-3-sonnet-20240229',
         max_tokens: 2000,
-        temperature: 0.3, // Reducido para mayor consistencia
+        temperature: 0.1, // Muy bajo para máxima consistencia
         messages: [
           {
             role: 'user',
@@ -151,80 +196,51 @@ export class AIService {
     return this.parseIdeasFromResponse(text, numberOfIdeas, 'Anthropic Claude');
   }
 
-  private static buildPrompt(company: Company, businessLine: BusinessLine, aiParams: AIParams, numberOfIdeas: number, providerName: string): string {
-    return `Eres un experto en marketing digital y creación de contenido para redes sociales.
+  private static buildStrictPrompt(company: Company, businessLine: BusinessLine, aiParams: AIParams, numberOfIdeas: number, providerName: string): string {
+    return `Eres un experto en marketing digital especializado en ${aiParams.socialNetwork}.
 
-IMPORTANTE: Estás usando ${providerName}. DEBES generar contenido que respete ESTRICTAMENTE todos los parámetros proporcionados.
+MISIÓN CRÍTICA: Generar contenido que respete ESTRICTAMENTE estos parámetros específicos.
 
-CONTEXTO DE LA EMPRESA:
-- Nombre: ${company.name}
-- Descripción: ${company.description}
-- Industria: ${company.industry}
+EMPRESA: ${company.name} (${company.industry})
+LÍNEA DE NEGOCIO: ${businessLine.name} - ${businessLine.description}
 
-LÍNEA DE NEGOCIO ESPECÍFICA:
-- Nombre: ${businessLine.name}
-- Descripción: ${businessLine.description}
+PARÁMETROS INMUTABLES:
+🎯 TONO: ${aiParams.tone} (OBLIGATORIO - no cambies esto)
+👤 PERSONAJE: ${aiParams.characterType} (OBLIGATORIO - no cambies esto)
+👥 AUDIENCIA: ${aiParams.targetAudience} (OBLIGATORIO - no cambies esto)
+📝 TIPO: ${aiParams.contentType} (OBLIGATORIO - no cambies esto)
+📱 PLATAFORMA: ${aiParams.socialNetwork} (OBLIGATORIO - no cambies esto)
+📄 FORMATO: ${aiParams.contentFormat} (OBLIGATORIO - no cambies esto)
+🎯 OBJETIVO: ${aiParams.objective} (OBLIGATORIO - no cambies esto)
+🔍 ENFOQUE: ${aiParams.focus} (OBLIGATORIO - incluye esto)
 
-PARÁMETROS OBLIGATORIOS (NO PUEDES CAMBIAR NINGUNO):
-- TONO OBLIGATORIO: ${aiParams.tone}
-- PERSONAJE OBLIGATORIO: ${aiParams.characterType}
-- AUDIENCIA OBLIGATORIA: ${aiParams.targetAudience}
-- TIPO DE CONTENIDO OBLIGATORIO: ${aiParams.contentType}
-- RED SOCIAL OBLIGATORIA: ${aiParams.socialNetwork}
-- FORMATO OBLIGATORIO: ${aiParams.contentFormat}
-- OBJETIVO OBLIGATORIO: ${aiParams.objective}
-- ENFOQUE OBLIGATORIO: ${aiParams.focus}
+REGLAS ESTRICTAS:
+1. Cada idea DEBE mencionar "${businessLine.name}" específicamente
+2. Cada idea DEBE usar el tono "${aiParams.tone}" exactamente
+3. Cada idea DEBE dirigirse a "${aiParams.targetAudience}" específicamente
+4. Cada idea DEBE ser para ${aiParams.socialNetwork} específicamente
+5. Cada idea DEBE usar formato ${aiParams.contentFormat} específicamente
+6. Cada idea DEBE cumplir objetivo ${aiParams.objective} específicamente
+7. Cada idea DEBE incluir enfoque "${aiParams.focus}"
 
-INSTRUCCIONES CRÍTICAS:
-1. Genera EXACTAMENTE ${numberOfIdeas} ideas de contenido
-2. TODAS las ideas DEBEN ser específicamente para ${aiParams.socialNetwork}
-3. El tono DEBE ser EXACTAMENTE "${aiParams.tone}" - no uses otros tonos
-4. El personaje DEBE ser EXACTAMENTE "${aiParams.characterType}" - no cambies el tipo de personaje
-5. La audiencia objetivo DEBE ser EXACTAMENTE "${aiParams.targetAudience}" - no uses otras audiencias
-6. El tipo de contenido DEBE ser EXACTAMENTE "${aiParams.contentType}" - no cambies el tipo
-7. El formato DEBE ser EXACTAMENTE "${aiParams.contentFormat}" - no uses otros formatos
-8. El objetivo DEBE ser EXACTAMENTE "${aiParams.objective}" - no cambies el objetivo
-9. DEBES incluir el enfoque específico: "${aiParams.focus}"
-10. Cada idea DEBE estar relacionada específicamente con "${businessLine.name}" de "${company.name}"
+EJEMPLOS DE CUMPLIMIENTO:
+✅ CORRECTO: "Como ${aiParams.characterType}, comparto estrategias para ${aiParams.targetAudience} sobre ${businessLine.name} con tono ${aiParams.tone}"
+❌ INCORRECTO: Cualquier contenido que no mencione estos elementos específicos
 
-EJEMPLO DE CUMPLIMIENTO:
-Si el tono es "Profesional y amigable", NO uses tonos casuales, formales, divertidos, etc.
-Si la audiencia es "Empresarios y emprendedores", NO uses contenido para jóvenes, consumidores finales, etc.
-Si el formato es "Post", NO generes Stories, Reels, Videos, etc.
+TAREA: Genera ${numberOfIdeas} ideas que cumplan TODOS los parámetros arriba.
 
-TAREA ESPECÍFICA:
-Genera ${numberOfIdeas} ideas de contenido que cumplan TODOS estos criterios:
-- Para la plataforma: ${aiParams.socialNetwork}
-- Con tono: ${aiParams.tone}
-- Como personaje: ${aiParams.characterType}
-- Para audiencia: ${aiParams.targetAudience}
-- Tipo de contenido: ${aiParams.contentType}
-- Formato: ${aiParams.contentFormat}
-- Objetivo: ${aiParams.objective}
-- Enfoque: ${aiParams.focus}
-- Relacionado con: ${businessLine.name} de ${company.name}
-
-FORMATO DE RESPUESTA OBLIGATORIO:
-Responde ÚNICAMENTE en formato JSON válido. NO incluyas texto adicional.
-
+FORMATO JSON OBLIGATORIO:
 [
   {
-    "title": "Título específico que refleje el tono ${aiParams.tone} y el formato ${aiParams.contentFormat}",
-    "description": "Descripción detallada que demuestre claramente el tono ${aiParams.tone}, dirigida a ${aiParams.targetAudience}, sobre ${businessLine.name}, con formato ${aiParams.contentFormat}",
-    "rationale": "Explicación específica de por qué esta idea cumple el objetivo ${aiParams.objective} para ${aiParams.targetAudience} con tono ${aiParams.tone} en ${aiParams.socialNetwork}",
-    "hashtags": ["#${company.industry.toLowerCase()}", "#${businessLine.name.toLowerCase().replace(/\s+/g, '')}", "#${aiParams.socialNetwork.toLowerCase()}", "#${aiParams.objective.toLowerCase()}", "#contenido"],
+    "title": "[${aiParams.socialNetwork}] Título que mencione ${businessLine.name} con tono ${aiParams.tone}",
+    "description": "Descripción específica sobre ${businessLine.name} dirigida a ${aiParams.targetAudience} con tono ${aiParams.tone} para ${aiParams.socialNetwork} formato ${aiParams.contentFormat}. Enfoque: ${aiParams.focus}",
+    "rationale": "Esta idea cumple el objetivo ${aiParams.objective} para ${aiParams.targetAudience} usando tono ${aiParams.tone} en ${aiParams.socialNetwork} sobre ${businessLine.name}",
+    "hashtags": ["#${aiParams.socialNetwork.toLowerCase()}", "#${businessLine.name.toLowerCase().replace(/\s+/g, '')}", "#${aiParams.objective.toLowerCase()}", "#${company.industry.toLowerCase()}", "#contenido"],
     "platform": "${aiParams.socialNetwork}"
   }
 ]
 
-VALIDACIÓN FINAL:
-- Verifica que cada idea respete TODOS los parámetros
-- Asegúrate de que el contenido sea específico para ${aiParams.socialNetwork}
-- Confirma que el tono sea exactamente "${aiParams.tone}"
-- Verifica que la audiencia sea exactamente "${aiParams.targetAudience}"
-- Confirma que el formato sea exactamente "${aiParams.contentFormat}"
-- Asegúrate de que el objetivo sea exactamente "${aiParams.objective}"
-- Verifica que incluya el enfoque "${aiParams.focus}"`;
+VERIFICACIÓN FINAL: Cada idea debe contener las palabras clave: "${businessLine.name}", "${aiParams.tone}", "${aiParams.targetAudience}", "${aiParams.socialNetwork}", "${aiParams.contentFormat}", "${aiParams.objective}"`;
   }
 
   private static parseIdeasFromResponse(responseText: string, expectedCount: number, providerName: string): ContentIdea[] {
@@ -264,17 +280,17 @@ VALIDACIÓN FINAL:
     }
   }
 
-  private static generateFallbackIdeas(request: IdeaGenerationRequest): ContentIdea[] {
+  private static generateEnhancedFallbackIdeas(request: IdeaGenerationRequest): ContentIdea[] {
     const { company, businessLine, aiParams, numberOfIdeas = 5 } = request;
     
     const fallbackIdeas: ContentIdea[] = [];
     
     for (let i = 1; i <= numberOfIdeas; i++) {
       fallbackIdeas.push({
-        title: `[Fallback] Idea ${i} para ${businessLine.name}`,
-        description: `Contenido relacionado con ${businessLine.description} para ${company.name}`,
-        rationale: `Esta idea es relevante para la audiencia objetivo: ${aiParams.targetAudience}`,
-        hashtags: [`#${company.industry.toLowerCase()}`, `#${businessLine.name.toLowerCase().replace(/\s+/g, '')}`, '#contenido', '#marketing', '#redessociales'],
+        title: `[Fallback] ${aiParams.contentFormat} para ${businessLine.name} - ${aiParams.tone}`,
+        description: `Contenido específico sobre ${businessLine.name} de ${company.name} dirigido a ${aiParams.targetAudience} con tono ${aiParams.tone} para ${aiParams.socialNetwork} en formato ${aiParams.contentFormat}. Objetivo: ${aiParams.objective}. Enfoque: ${aiParams.focus}`,
+        rationale: `Esta idea cumple el objetivo ${aiParams.objective} para ${aiParams.targetAudience} usando tono ${aiParams.tone} en ${aiParams.socialNetwork} sobre ${businessLine.name}`,
+        hashtags: [`#${aiParams.socialNetwork.toLowerCase()}", "#${businessLine.name.toLowerCase().replace(/\s+/g, '')}", "#${aiParams.objective.toLowerCase()}", "#${company.industry.toLowerCase()}", "#contenido"],
         platform: aiParams.socialNetwork
       });
     }
