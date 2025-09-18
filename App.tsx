@@ -6,7 +6,6 @@ import { BusinessLineManager } from './components/BusinessLineManager';
 import { IdeaGenerator } from './components/IdeaGenerator';
 import { Header } from './components/Header';
 import { ApiDebugger } from './components/ApiDebugger';
-import { GeminiStatusBanner } from './components/GeminiStatusBanner';
 import { QuickNavigation } from './components/QuickNavigation';
 import { CompanyService } from './services/companyService';
 import { theme, darkTheme } from './src/theme';
@@ -180,11 +179,7 @@ export default function App() {
           onLogout={() => {}} // Mock logout function
         />
         
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-          {/* Gemini Status Banner */}
-          <Box sx={{ mb: 4 }}>
-            <GeminiStatusBanner />
-          </Box>
+          <Container maxWidth="xl" sx={{ py: 4 }}>
           
           {/* Hero Section */}
           <Box sx={{ textAlign: 'center', mb: 6 }}>
