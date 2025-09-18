@@ -337,4 +337,27 @@ export class CompanyService {
       throw error;
     }
   }
+
+  // Save AI parameters (create or update)
+  static async saveAIParams(
+    companyId: string,
+    businessLineId: string,
+    aiParamsData: Partial<AIParams>
+  ): Promise<AIParams> {
+    try {
+      // First, try to get existing AI params
+      const existingParams = await this.getAIParams(companyId, businessLineId);
+      
+      if (existingParams) {
+        // Update existing params
+        return await this.updateAIParams(companyId, businessLineId, existingParams.id, aiParamsData);
+      } else {
+        // Create new params
+        return await this.createAIParams(companyId, businessLineId, aiParamsData as any);
+      }
+    } catch (error) {
+      console.error("Error saving AI parameters:", error);
+      throw error;
+    }
+  }
 }

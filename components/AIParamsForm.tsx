@@ -24,6 +24,7 @@ import {
   AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import { CompanyService } from '../services/companyService';
+import { AIProviderSelector, AIProvider } from './AIProviderSelector';
 import type { AIParams, Company, BusinessLine } from '../types';
 
 interface AIParamsFormProps {
@@ -40,6 +41,7 @@ export const AIParamsForm: React.FC<AIParamsFormProps> = ({
   onCancel
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<AIProvider>('openai');
   const [aiParams, setAiParams] = useState<Partial<AIParams>>({
     tone: 'Profesional y amigable',
     characterType: 'Experto en la industria',
@@ -186,6 +188,15 @@ export const AIParamsForm: React.FC<AIParamsFormProps> = ({
             {error}
           </Alert>
         )}
+
+        {/* AI Provider Selection */}
+        <Box sx={{ mb: 3 }}>
+          <AIProviderSelector
+            selectedProvider={selectedProvider}
+            onProviderChange={setSelectedProvider}
+            disabled={isLoading}
+          />
+        </Box>
 
         <Grid container spacing={3} sx={{ mt: 1 }}>
           {/* Tone */}
