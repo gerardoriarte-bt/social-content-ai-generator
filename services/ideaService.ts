@@ -41,12 +41,12 @@ export class IdeaService {
   }
 
   // Generate content ideas using AI
-  static async generateIdeas(companyId: string, businessLineId: string, numberOfIdeas: number = 5): Promise<ContentIdea[]> {
+  static async generateIdeas(companyId: string, businessLineId: string, numberOfIdeas: number = 5, provider: string = "gemini"): Promise<ContentIdea[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/ideas/companies/${companyId}/business-lines/${businessLineId}/generate`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
-        body: JSON.stringify({ numberOfIdeas }),
+        body: JSON.stringify({ numberOfIdeas, provider }),
       });
 
       const data = await this.handleResponse<{ ideas: ContentIdea[] }>(response);
